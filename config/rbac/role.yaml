@@ -1,0 +1,59 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - bridgeconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - bridgeconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - bridgeconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - bridges
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - bridges/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - bridges/status
+  verbs:
+  - get
+  - patch
+  - update

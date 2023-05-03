@@ -1,0 +1,54 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: mutating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-kvnet-kojuro-date-v1alpha1-bridgeconfig
+  failurePolicy: Fail
+  name: mbridgeconfig.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bridgeconfigs
+  sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-kvnet-kojuro-date-v1alpha1-bridgeconfig
+  failurePolicy: Fail
+  name: vbridgeconfig.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bridgeconfigs
+  sideEffects: None
