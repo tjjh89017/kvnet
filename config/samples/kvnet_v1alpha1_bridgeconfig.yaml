@@ -9,4 +9,6 @@ metadata:
     app.kubernetes.io/created-by: kvnet
   name: bridgeconfig-sample
 spec:
+  selector: {}
+
   # TODO(user): Add fields here

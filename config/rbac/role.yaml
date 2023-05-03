@@ -6,6 +6,32 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - nodes/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - kvnet.kojuro.date
   resources:
   - bridgeconfigs

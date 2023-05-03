@@ -22,16 +22,20 @@ import (
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-const BridgeConfigFinalizer string = "kvnet.kojuro.date/finalizer"
+const (
+	BridgeConfigFinalizer      = "kvnet.kojuro.date/finalizer"
+	BridgeConfigNamespaceLabel = "bridgeconfig.kvnet.kojuro.date/namespace"
+	BridgeConfigNameLabel      = "bridgeconfig.kvnet.kojuro.date/name"
+)
 
 // BridgeConfigSpec defines the desired state of BridgeConfig
 type BridgeConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	NodeSelector  metav1.LabelSelector `json:"selector,omitempty"`
-	BridgeName    string               `json:"bridge,omitempty"`
-	VlanFiltering bool                 `json:"vlanFiltering,omitempty"`
+	NodeSelector  *metav1.LabelSelector `json:"selector,omitempty"`
+	BridgeName    string                `json:"bridge,omitempty"`
+	VlanFiltering bool                  `json:"vlanFiltering,omitempty"`
 }
 
 // BridgeConfigStatus defines the observed state of BridgeConfig
