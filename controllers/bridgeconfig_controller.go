@@ -175,7 +175,7 @@ func (r *BridgeConfigReconciler) addBridge(ctx context.Context, nodeName string,
 		Spec:       bridgeConfig.Spec.Template.Spec,
 	}
 	bridge.Namespace = bridgeConfig.Namespace
-	bridge.Name = fmt.Sprintf("%s.%s", nodeName, bridgeConfig.Spec.Template.Spec.BridgeName)
+	bridge.Name = fmt.Sprintf("%s.%s", nodeName, bridgeConfig.Spec.BridgeName)
 
 	if bridge.Labels == nil {
 		bridge.Labels = make(map[string]string)
@@ -204,7 +204,7 @@ func (r *BridgeConfigReconciler) updateBridge(ctx context.Context, nodeName stri
 	bridge := &kvnetv1alpha1.Bridge{}
 	if err := r.Get(ctx, types.NamespacedName{
 		Namespace: bridgeConfig.Namespace,
-		Name:      fmt.Sprintf("%s.%s", nodeName, bridgeConfig.Spec.Template.Spec.BridgeName),
+		Name:      fmt.Sprintf("%s.%s", nodeName, bridgeConfig.Spec.BridgeName),
 	}, bridge); err != nil {
 		return err
 	}

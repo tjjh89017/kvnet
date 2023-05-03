@@ -35,6 +35,7 @@ type BridgeConfigSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	NodeSelector *metav1.LabelSelector `json:"selector,omitempty"`
+	BridgeName   string                `json:"bridge,omitempty"`
 	Template     BridgeTemplateSpec    `json:"template,omitempty"`
 }
 

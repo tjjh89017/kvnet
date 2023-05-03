@@ -35,6 +35,8 @@ spec:
           spec:
             description: BridgeConfigSpec defines the desired state of BridgeConfig
             properties:
+              bridge:
+                type: string
               selector:
                 description: A label selector is a label query over a set of resources.
                   The result of matchLabels and matchExpressions are ANDed. An empty
@@ -91,8 +93,6 @@ spec:
                   spec:
                     description: BridgeSpec defines the desired state of Bridge
                     properties:
-                      bridge:
-                        type: string
                       stp:
                         type: boolean
                       vlanFiltering:

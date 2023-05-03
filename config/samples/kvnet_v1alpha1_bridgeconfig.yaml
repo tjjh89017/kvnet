@@ -10,9 +10,9 @@ metadata:
   name: bridgeconfig-sample
 spec:
   selector: {}
+  bridge: br0
   template:
     spec:
-      bridge: br0
       vlanFiltering: false
 
   # TODO(user): Add fields here

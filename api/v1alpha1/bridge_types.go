@@ -31,9 +31,8 @@ type BridgeSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	BridgeName    string `json:"bridge,omitempty"`
-	VlanFiltering bool   `json:"vlanFiltering,omitempty"`
-	SpanningTree  bool   `json:"stp,omitempty"`
+	VlanFiltering bool `json:"vlanFiltering,omitempty"`
+	SpanningTree  bool `json:"stp,omitempty"`
 }
 
 // BridgeStatus defines the observed state of Bridge
