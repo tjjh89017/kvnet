@@ -35,10 +35,12 @@ spec:
           spec:
             description: BridgeSpec defines the desired state of Bridge
             properties:
-              foo:
-                description: Foo is an example field of Bridge. Edit bridge_types.go
-                  to remove/update
+              bridge:
                 type: string
+              stp:
+                type: boolean
+              vlanFiltering:
+                type: boolean
             type: object
           status:
             description: BridgeStatus defines the observed state of Bridge

@@ -11,6 +11,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-kvnet-kojuro-date-v1alpha1-bridge
+  failurePolicy: Fail
+  name: mbridge.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bridges
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-kvnet-kojuro-date-v1alpha1-bridgeconfig
   failurePolicy: Fail
   name: mbridgeconfig.kb.io
@@ -32,6 +52,26 @@ metadata:
   creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-kvnet-kojuro-date-v1alpha1-bridge
+  failurePolicy: Fail
+  name: vbridge.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bridges
+  sideEffects: None
 - admissionReviewVersions:
   - v1
   clientConfig:

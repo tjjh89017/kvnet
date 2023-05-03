@@ -26,6 +26,7 @@ const (
 	BridgeConfigFinalizer      = "kvnet.kojuro.date/finalizer"
 	BridgeConfigNamespaceLabel = "bridgeconfig.kvnet.kojuro.date/namespace"
 	BridgeConfigNameLabel      = "bridgeconfig.kvnet.kojuro.date/name"
+	NodeLabel                  = "kubernetes.io/hostname"
 )
 
 // BridgeConfigSpec defines the desired state of BridgeConfig
@@ -33,9 +34,14 @@ type BridgeConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	NodeSelector  *metav1.LabelSelector `json:"selector,omitempty"`
-	BridgeName    string                `json:"bridge,omitempty"`
-	VlanFiltering bool                  `json:"vlanFiltering,omitempty"`
+	NodeSelector *metav1.LabelSelector `json:"selector,omitempty"`
+	Template     BridgeTemplateSpec    `json:"template,omitempty"`
+}
+
+// BridgeTemplateSpec
+type BridgeTemplateSpec struct {
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              BridgeSpec `json:"spec,omitempty"`
 }
 
 // BridgeConfigStatus defines the observed state of BridgeConfig

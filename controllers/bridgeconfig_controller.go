@@ -20,15 +20,21 @@ import (
 	"context"
 	"fmt"
 	"github.com/sirupsen/logrus"
+	"reflect"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
 )
@@ -101,23 +107,42 @@ func (r *BridgeConfigReconciler) OnChange(ctx context.Context, bridgeConfig *kvn
 		return ctrl.Result{}, err
 	}
 
-	logrus.Infof("nodes: %v", nodes)
+	bridges, err := r.findBridge(ctx, "", bridgeConfig)
+	if err != nil {
+		logrus.Errorf("bridge list fail %v", err)
+		return ctrl.Result{}, err
+	}
 
-	// TODO need to check if bridge is existed
-
+	nodeMap := make(map[string]int)
 	for _, node := range nodes.Items {
-		if err := r.Create(ctx, &kvnetv1alpha1.Bridge{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: bridgeConfig.Namespace,
-				Name:      fmt.Sprintf("%s.%s", node.Name, bridgeConfig.Name),
-				Labels: map[string]string{
-					kvnetv1alpha1.BridgeConfigNamespaceLabel: bridgeConfig.Namespace,
-					kvnetv1alpha1.BridgeConfigNameLabel:      bridgeConfig.Name,
-				},
-			},
-		}); err != nil {
-			logrus.Errorf("create error %v", err)
-			return ctrl.Result{}, err
+		// set 1 to mark we should create but we still not
+		nodeMap[node.Name] = 1
+	}
+	for _, bridge := range bridges.Items {
+		// get node name
+		name := strings.Split(bridge.Name, ".")[0]
+		// already have bridge
+		nodeMap[name] |= 2
+	}
+
+	for nodeName, state := range nodeMap {
+		switch state {
+		case 1:
+			// need create
+			if err := r.addBridge(ctx, nodeName, bridgeConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+		case 2:
+			// need delete
+			if err := r.delBridge(ctx, nodeName, bridgeConfig); err != nil {
+				return ctrl.Result{}, err
+			}
+		case 3:
+			// check spec is the same
+			// check bridge belongs to this bridgeConfig first
+			if err := r.updateBridge(ctx, nodeName, bridgeConfig); err != nil {
+				return ctrl.Result{}, err
+			}
 		}
 	}
 
@@ -127,19 +152,13 @@ func (r *BridgeConfigReconciler) OnChange(ctx context.Context, bridgeConfig *kvn
 func (r *BridgeConfigReconciler) OnRemove(ctx context.Context, bridgeConfig *kvnetv1alpha1.BridgeConfig) (ctrl.Result, error) {
 	logrus.Info("OnRemove")
 
-	bridgeList := &kvnetv1alpha1.BridgeList{}
-	opts := []client.ListOption{
-		client.MatchingLabels{
-			kvnetv1alpha1.BridgeConfigNamespaceLabel: bridgeConfig.Namespace,
-			kvnetv1alpha1.BridgeConfigNameLabel:      bridgeConfig.Name,
-		},
-	}
-
-	if err := r.List(ctx, bridgeList, opts...); err != nil {
+	bridgeList, err := r.findBridge(ctx, "", bridgeConfig)
+	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	logrus.Info("remove bridge")
+	// TODO change to DeleteAllOf
 	for _, bridge := range bridgeList.Items {
 		if err := r.Delete(ctx, &bridge); err != nil {
 			logrus.Errorf("delete fail %v", err)
@@ -150,9 +169,110 @@ func (r *BridgeConfigReconciler) OnRemove(ctx context.Context, bridgeConfig *kvn
 	return ctrl.Result{}, nil
 }
 
+func (r *BridgeConfigReconciler) addBridge(ctx context.Context, nodeName string, bridgeConfig *kvnetv1alpha1.BridgeConfig) error {
+	bridge := &kvnetv1alpha1.Bridge{
+		ObjectMeta: bridgeConfig.Spec.Template.ObjectMeta,
+		Spec:       bridgeConfig.Spec.Template.Spec,
+	}
+	bridge.Namespace = bridgeConfig.Namespace
+	bridge.Name = fmt.Sprintf("%s.%s", nodeName, bridgeConfig.Spec.Template.Spec.BridgeName)
+
+	if bridge.Labels == nil {
+		bridge.Labels = make(map[string]string)
+	}
+	bridge.Labels[kvnetv1alpha1.BridgeConfigNamespaceLabel] = bridgeConfig.Namespace
+	bridge.Labels[kvnetv1alpha1.BridgeConfigNameLabel] = bridgeConfig.Name
+	bridge.Labels[kvnetv1alpha1.NodeLabel] = nodeName
+
+	return r.Create(ctx, bridge)
+}
+
+func (r *BridgeConfigReconciler) delBridge(ctx context.Context, nodeName string, bridgeConfig *kvnetv1alpha1.BridgeConfig) error {
+	bridges, err := r.findBridge(ctx, nodeName, bridgeConfig)
+	if err != nil {
+		return err
+	}
+	for _, bridge := range bridges.Items {
+		if err := r.Delete(ctx, &bridge); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *BridgeConfigReconciler) updateBridge(ctx context.Context, nodeName string, bridgeConfig *kvnetv1alpha1.BridgeConfig) error {
+	bridge := &kvnetv1alpha1.Bridge{}
+	if err := r.Get(ctx, types.NamespacedName{
+		Namespace: bridgeConfig.Namespace,
+		Name:      fmt.Sprintf("%s.%s", nodeName, bridgeConfig.Spec.Template.Spec.BridgeName),
+	}, bridge); err != nil {
+		return err
+	}
+
+	if bridge.Labels[kvnetv1alpha1.BridgeConfigNamespaceLabel] != bridgeConfig.Namespace ||
+		bridge.Labels[kvnetv1alpha1.BridgeConfigNameLabel] != bridgeConfig.Name {
+		return fmt.Errorf("bridge %s is not belong to this bridgeConfig", bridge.Name)
+	}
+	// It should be only one
+	if !reflect.DeepEqual(bridge.Spec, bridgeConfig.Spec.Template.Spec) {
+		bridge.Spec = bridgeConfig.Spec.Template.Spec
+		if err := r.Update(ctx, bridge); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *BridgeConfigReconciler) findBridge(ctx context.Context, nodeName string, bridgeConfig *kvnetv1alpha1.BridgeConfig) (*kvnetv1alpha1.BridgeList, error) {
+	bridgeList := &kvnetv1alpha1.BridgeList{}
+	opts := []client.ListOption{
+		client.MatchingLabels{
+			kvnetv1alpha1.BridgeConfigNamespaceLabel: bridgeConfig.Namespace,
+			kvnetv1alpha1.BridgeConfigNameLabel:      bridgeConfig.Name,
+		},
+	}
+
+	if nodeName != "" {
+		opts = append(opts, client.MatchingLabels{
+			kvnetv1alpha1.NodeLabel: nodeName,
+		})
+	}
+
+	if err := r.List(ctx, bridgeList, opts...); err != nil {
+		return nil, err
+	}
+	return bridgeList, nil
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BridgeConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kvnetv1alpha1.BridgeConfig{}).
+		Watches(
+			&source.Kind{Type: &corev1.Node{}},
+			handler.EnqueueRequestsFromMapFunc(r.BridgeConfigNodeWatchMap),
+		).
 		Complete(r)
+}
+
+func (r *BridgeConfigReconciler) BridgeConfigNodeWatchMap(obj client.Object) []reconcile.Request {
+	requests := []reconcile.Request{}
+
+	bridgeConfigs := &kvnetv1alpha1.BridgeConfigList{}
+	if err := r.List(context.Background(), bridgeConfigs); err != nil {
+		logrus.Errorf("cannot reconcile bridge configs for node change")
+		return requests
+	}
+
+	for _, bridgeConfig := range bridgeConfigs.Items {
+		requests = append(requests,
+			reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      bridgeConfig.Name,
+					Namespace: bridgeConfig.Namespace,
+				},
+			},
+		)
+	}
+	return requests
 }

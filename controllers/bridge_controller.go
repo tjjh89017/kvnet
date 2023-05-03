@@ -18,10 +18,13 @@ package controllers
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
@@ -47,9 +50,42 @@ type BridgeReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *BridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqLogger := log.FromContext(ctx)
+	reqLogger.Info("Reconciling Bridge")
 
-	// TODO(user): your logic here
+	bridge := &kvnetv1alpha1.Bridge{}
+	if err := r.Get(ctx, req.NamespacedName, bridge); err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Bridge resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		reqLogger.Error(err, "Failed to get Bridge")
+		return ctrl.Result{}, err
+	}
+
+	if bridge.GetDeletionTimestamp() != nil {
+		if result, err := r.OnRemove(ctx, bridge); err != nil {
+			return result, err
+		}
+
+		controllerutil.RemoveFinalizer(bridge, kvnetv1alpha1.BridgeFinalizer)
+		if err := r.Update(ctx, bridge); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	return r.OnChange(ctx, bridge)
+}
+
+func (r *BridgeReconciler) OnChange(ctx context.Context, bridge *kvnetv1alpha1.Bridge) (ctrl.Result, error) {
+	logrus.Info("OnChange")
+
+	return ctrl.Result{}, nil
+}
+
+func (r *BridgeReconciler) OnRemove(ctx context.Context, bridge *kvnetv1alpha1.Bridge) (ctrl.Result, error) {
+	logrus.Info("OnRemove")
 
 	return ctrl.Result{}, nil
 }

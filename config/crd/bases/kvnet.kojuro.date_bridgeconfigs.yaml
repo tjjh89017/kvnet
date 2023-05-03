@@ -35,8 +35,6 @@ spec:
           spec:
             description: BridgeConfigSpec defines the desired state of BridgeConfig
             properties:
-              bridge:
-                type: string
               selector:
                 description: A label selector is a label query over a set of resources.
                   The result of matchLabels and matchExpressions are ANDed. An empty
@@ -85,8 +83,22 @@ spec:
                     type: object
                 type: object
                 x-kubernetes-map-type: atomic
-              vlanFiltering:
-                type: boolean
+              template:
+                description: BridgeTemplateSpec
+                properties:
+                  metadata:
+                    type: object
+                  spec:
+                    description: BridgeSpec defines the desired state of Bridge
+                    properties:
+                      bridge:
+                        type: string
+                      stp:
+                        type: boolean
+                      vlanFiltering:
+                        type: boolean
+                    type: object
+                type: object
             type: object
           status:
             description: BridgeConfigStatus defines the observed state of BridgeConfig
