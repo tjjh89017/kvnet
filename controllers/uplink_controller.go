@@ -23,10 +23,13 @@ import (
 	"github.com/sirupsen/logrus"
 	"os"
 	"os/exec"
+	"reflect"
 	"strings"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -44,6 +47,9 @@ type UplinkReconciler struct {
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=uplinks,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=uplinks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=uplinks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -152,17 +158,27 @@ func (r *UplinkReconciler) OnChange(ctx context.Context, uplink *kvnetv1alpha1.U
 		return ctrl.Result{}, err
 	}
 
+	if err := r.setUplinkNodeLabel(ctx, uplink, uplinkName); err != nil {
+		logrus.Errorf("fail to set node label %v", err)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
 func (r *UplinkReconciler) OnRemove(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) (ctrl.Result, error) {
 	logrus.Info("OnRemove")
 
-	err := r.delUplinkNetDev(ctx, uplink, uplinkName)
-	if err != nil {
+	if err := r.delUplinkNetDev(ctx, uplink, uplinkName); err != nil {
 		logrus.Errorf("del uplink net dev error %v", err)
+		return ctrl.Result{}, err
 	}
-	return ctrl.Result{}, err
+
+	if err := r.delUplinkNodeLabel(ctx, uplink, uplinkName); err != nil {
+		logrus.Errorf("del node label fail %v", err)
+		return ctrl.Result{}, err
+	}
+	return ctrl.Result{}, nil
 }
 
 func (r *UplinkReconciler) findUplinkNetDev(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
@@ -288,6 +304,53 @@ func (r *UplinkReconciler) setUplinkMaster(uplink string, master string) error {
 	}
 	cmd.Env = os.Environ()
 	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setUplinkNodeLabel(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	nodeName := os.Getenv("NODENAME")
+	node := &corev1.Node{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		logrus.Errorf("get node %s failed %v", nodeName, err)
+		return err
+	}
+
+	nodeCopy := node.DeepCopy()
+	if nodeCopy.Labels == nil {
+		nodeCopy.Labels = make(map[string]string)
+	}
+
+	nodeCopy.Labels[kvnetv1alpha1.UplinkNodeLabel+uplinkName] = uplink.Spec.Master
+	if !reflect.DeepEqual(node, nodeCopy) {
+		if err := r.Update(ctx, nodeCopy); err != nil {
+			logrus.Errorf("update node label failed %v", err)
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *UplinkReconciler) delUplinkNodeLabel(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	nodeName := os.Getenv("NODENAME")
+	node := &corev1.Node{}
+	if err := r.Get(ctx, types.NamespacedName{Name: nodeName}, node); err != nil {
+		logrus.Errorf("get node %s failed %v", nodeName, err)
+		return err
+	}
+
+	nodeCopy := node.DeepCopy()
+	if nodeCopy.Labels == nil {
+		// no label
+		return nil
+	}
+
+	delete(nodeCopy.Labels, kvnetv1alpha1.UplinkNodeLabel+uplinkName)
+	if !reflect.DeepEqual(node, nodeCopy) {
+		if err := r.Update(ctx, nodeCopy); err != nil {
+			logrus.Errorf("update node label failed %v", err)
+			return err
+		}
+	}
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.

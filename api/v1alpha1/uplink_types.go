@@ -24,6 +24,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 const (
 	UplinkFinalizer = "uplink.kvnet.kojuro.date/finalizer"
+	UplinkNodeLabel = "uplink.kvnet.kojuro.date/"
 )
 
 // UplinkSpec defines the desired state of Uplink

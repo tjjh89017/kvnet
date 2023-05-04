@@ -24,6 +24,7 @@ import (
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 const (
 	BridgeFinalizer = "bridge.kvnet.kojuro.date/finalizer"
+	BridgeNodeLabel = "bridge.kvnet.kojuro.date/"
 )
 
 // BridgeSpec defines the desired state of Bridge
