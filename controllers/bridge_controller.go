@@ -125,6 +125,11 @@ func (r *BridgeReconciler) OnChange(ctx context.Context, bridge *kvnetv1alpha1.B
 		return ctrl.Result{}, err
 	}
 
+	if err := r.setBridgeNetDevUp(ctx, bridge, bridgeName); err != nil {
+		logrus.Errorf("fail to set bridge %s up: %v", bridgeName, err)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -152,6 +157,12 @@ func (r *BridgeReconciler) addBridgeNetDev(ctx context.Context, bridge *kvnetv1a
 
 func (r *BridgeReconciler) delBridgeNetDev(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
 	cmd := exec.Command("ip", "link", "del", bridgeName)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *BridgeReconciler) setBridgeNetDevUp(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	cmd := exec.Command("ip", "link", "set", bridgeName, "up")
 	cmd.Env = os.Environ()
 	return cmd.Run()
 }
