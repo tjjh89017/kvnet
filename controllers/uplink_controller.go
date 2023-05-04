@@ -142,11 +142,9 @@ func (r *UplinkReconciler) OnChange(ctx context.Context, uplink *kvnetv1alpha1.U
 	}
 
 	// set bond master to bridge
-	if uplink.Spec.Master != "" {
-		if err := r.setUplinkMaster(uplinkName, uplink.Spec.Master); err != nil {
-			logrus.Errorf("set uplink to master fail %v", err)
-			return ctrl.Result{}, err
-		}
+	if err := r.setUplinkMaster(uplinkName, uplink.Spec.Master); err != nil {
+		logrus.Errorf("set uplink to master fail %v", err)
+		return ctrl.Result{}, err
 	}
 
 	if err := r.setUplinkNetDevUp(ctx, uplink, uplinkName); err != nil {
@@ -224,40 +222,45 @@ func (r *UplinkReconciler) setUplinkNetDevSlaves(ctx context.Context, uplink *kv
 
 	for _, slave := range uplink.Spec.BondSlaves {
 		// check bondslaves has master
-		if err := r.getSlavesMaster(slave); err != nil {
-			return err
-		}
-		// set bondslave to down
-		if err := r.setSalvesDown(slave); err != nil {
-			return err
-		}
-		// set bondslave to bond
-		if err := r.setSlavesMaster(slave, uplinkName); err != nil {
-			return err
-		}
-		// set bondslave to up
-		if err := r.setSalvesUp(slave); err != nil {
-			return err
+		master := r.getSlavesMaster(slave)
+		switch master {
+		case "":
+			// set bondslave to down
+			if err := r.setSalvesDown(slave); err != nil {
+				return err
+			}
+			// set bondslave to bond
+			if err := r.setSlavesMaster(slave, uplinkName); err != nil {
+				return err
+			}
+			// set bondslave to up
+			if err := r.setSalvesUp(slave); err != nil {
+				return err
+			}
+		case uplinkName:
+			// skip
+		default:
+			return fmt.Errorf("slave %s has other master", slave)
 		}
 	}
 	return nil
 }
 
-func (r *UplinkReconciler) getSlavesMaster(slave string) error {
+func (r *UplinkReconciler) getSlavesMaster(slave string) string {
 	cmd := exec.Command("ip", "-j", "link", "show", slave)
 	cmd.Env = os.Environ()
 	output, err := cmd.Output()
 
 	if err != nil {
-		return err
+		return ""
 	}
 
 	var intf []map[string]string
 	json.Unmarshal([]byte(output), &intf)
-	if _, ok := intf[0]["master"]; ok {
-		return fmt.Errorf("%s has master", slave)
+	if m, ok := intf[0]["master"]; ok {
+		return m
 	}
-	return nil
+	return ""
 }
 
 func (r *UplinkReconciler) setSlavesMaster(slave string, uplink string) error {
@@ -279,7 +282,10 @@ func (r *UplinkReconciler) setSalvesUp(slave string) error {
 }
 
 func (r *UplinkReconciler) setUplinkMaster(uplink string, master string) error {
-	cmd := exec.Command("ip", "link", "set", uplink, "master", master)
+	cmd := exec.Command("ip", "link", "set", uplink, "nomaster")
+	if master != "" {
+		cmd = exec.Command("ip", "link", "set", uplink, "master", master)
+	}
 	cmd.Env = os.Environ()
 	return cmd.Run()
 }
