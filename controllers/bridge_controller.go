@@ -18,7 +18,11 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/sirupsen/logrus"
+	"os"
+	"os/exec"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,31 +67,103 @@ func (r *BridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	// check this file is this node
+	nodeName := os.Getenv("NODENAME")
+	tmpName := strings.Split(bridge.Name, ".")
+	if len(tmpName) < 2 {
+		return ctrl.Result{}, fmt.Errorf("error to parse bridge name: %v", bridge.Name)
+	}
+	bridgeNodeName := tmpName[0]
+	bridgeName := tmpName[1]
+	if bridgeNodeName != nodeName {
+		// not ours, skip it
+		logrus.Infof("skip bridge %s", bridge.Name)
+		return ctrl.Result{}, nil
+	}
+
 	if bridge.GetDeletionTimestamp() != nil {
-		if result, err := r.OnRemove(ctx, bridge); err != nil {
+		if !controllerutil.ContainsFinalizer(bridge, kvnetv1alpha1.BridgeFinalizer) {
+			logrus.Info("already onRemove")
+			return ctrl.Result{}, nil
+		}
+
+		if result, err := r.OnRemove(ctx, bridge, bridgeName); err != nil {
 			return result, err
 		}
 
+		logrus.Info("remove finalizer")
 		controllerutil.RemoveFinalizer(bridge, kvnetv1alpha1.BridgeFinalizer)
 		if err := r.Update(ctx, bridge); err != nil {
+			logrus.Errorf("remove finalizer fail %v", err)
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{}, nil
 	}
 
-	return r.OnChange(ctx, bridge)
+	return r.OnChange(ctx, bridge, bridgeName)
 }
 
-func (r *BridgeReconciler) OnChange(ctx context.Context, bridge *kvnetv1alpha1.Bridge) (ctrl.Result, error) {
+func (r *BridgeReconciler) OnChange(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) (ctrl.Result, error) {
 	logrus.Info("OnChange")
 
+	if err := r.findBridgeNetDev(ctx, bridge, bridgeName); err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
+			logrus.Errorf("fail to find bridge net dev %v", err)
+			return ctrl.Result{}, err
+		}
+		// not found, create bridge
+		if err := r.addBridgeNetDev(ctx, bridge, bridgeName); err != nil {
+			logrus.Errorf("fail to add bridge %s: %v", bridgeName, err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	// override the config always
+	// vlan filtering
+	if err := r.setBridgeNetDevVlanFiltering(ctx, bridge, bridgeName); err != nil {
+		logrus.Errorf("fail to set vlanfiltering %s: %v", bridgeName, err)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
-func (r *BridgeReconciler) OnRemove(ctx context.Context, bridge *kvnetv1alpha1.Bridge) (ctrl.Result, error) {
+func (r *BridgeReconciler) OnRemove(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) (ctrl.Result, error) {
 	logrus.Info("OnRemove")
 
-	return ctrl.Result{}, nil
+	err := r.delBridgeNetDev(ctx, bridge, bridgeName)
+	if err != nil {
+		logrus.Errorf("del bridge net dev error %v", err)
+	}
+	return ctrl.Result{}, err
+}
+
+func (r *BridgeReconciler) findBridgeNetDev(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	cmd := exec.Command("ip", "-j", "link", "show", "dev", bridgeName)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *BridgeReconciler) addBridgeNetDev(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	cmd := exec.Command("ip", "link", "add", bridgeName, "type", "bridge")
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *BridgeReconciler) delBridgeNetDev(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	cmd := exec.Command("ip", "link", "del", bridgeName)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *BridgeReconciler) setBridgeNetDevVlanFiltering(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	enable := "0"
+	if bridge.Spec.VlanFiltering {
+		enable = "1"
+	}
+	cmd := exec.Command("ip", "link", "set", bridgeName, "type", "bridge", "vlan_filtering", enable)
+	cmd.Env = os.Environ()
+	return cmd.Run()
 }
 
 // SetupWithManager sets up the controller with the Manager.

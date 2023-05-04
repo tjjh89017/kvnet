@@ -35,8 +35,6 @@ spec:
           spec:
             description: BridgeSpec defines the desired state of Bridge
             properties:
-              stp:
-                type: boolean
               vlanFiltering:
                 type: boolean
             type: object

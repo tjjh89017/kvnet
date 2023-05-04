@@ -32,7 +32,6 @@ type BridgeSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	VlanFiltering bool `json:"vlanFiltering,omitempty"`
-	SpanningTree  bool `json:"stp,omitempty"`
 }
 
 // BridgeStatus defines the observed state of Bridge

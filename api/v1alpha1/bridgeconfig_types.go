@@ -26,7 +26,7 @@ const (
 	BridgeConfigFinalizer      = "kvnet.kojuro.date/finalizer"
 	BridgeConfigNamespaceLabel = "bridgeconfig.kvnet.kojuro.date/namespace"
 	BridgeConfigNameLabel      = "bridgeconfig.kvnet.kojuro.date/name"
-	NodeLabel                  = "kubernetes.io/hostname"
+	NodeLabel                  = "bridgeconfig.kvnet.kojuro.date/node"
 )
 
 // BridgeConfigSpec defines the desired state of BridgeConfig

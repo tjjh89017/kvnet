@@ -52,11 +52,13 @@ func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var probeAddr string
+	var agent bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&agent, "agent", false, "Enable agent mode.")
 	opts := zap.Options{
 		Development: true,
 	}
@@ -89,29 +91,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controllers.BridgeConfigReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "BridgeConfig")
-		os.Exit(1)
+	if agent {
+		if err = (&controllers.BridgeReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Bridge")
+			os.Exit(1)
+		}
+	} else {
+		if err = (&controllers.BridgeConfigReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "BridgeConfig")
+			os.Exit(1)
+		}
+		if err = (&kvnetv1alpha1.BridgeConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "BridgeConfig")
+			os.Exit(1)
+		}
+		if err = (&kvnetv1alpha1.Bridge{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Bridge")
+			os.Exit(1)
+		}
+		//+kubebuilder:scaffold:builder
 	}
-	if err = (&controllers.BridgeReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Bridge")
-		os.Exit(1)
-	}
-	if err = (&kvnetv1alpha1.BridgeConfig{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "BridgeConfig")
-		os.Exit(1)
-	}
-	if err = (&kvnetv1alpha1.Bridge{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Bridge")
-		os.Exit(1)
-	}
-	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")

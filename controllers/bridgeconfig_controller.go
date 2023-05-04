@@ -79,6 +79,11 @@ func (r *BridgeConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 
 	if bridgeConfig.GetDeletionTimestamp() != nil {
+		if !controllerutil.ContainsFinalizer(bridgeConfig, kvnetv1alpha1.BridgeConfigFinalizer) {
+			logrus.Info("already onRemove")
+			return ctrl.Result{}, nil
+		}
+
 		if result, err := r.OnRemove(ctx, bridgeConfig); err != nil {
 			return result, err
 		}
