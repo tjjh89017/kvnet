@@ -142,9 +142,11 @@ func (r *UplinkReconciler) OnChange(ctx context.Context, uplink *kvnetv1alpha1.U
 	}
 
 	// set bond master to bridge
-	if err := r.setUplinkMaster(uplinkName, uplink.Spec.Master); err != nil {
-		logrus.Errorf("set uplink to master fail %v", err)
-		return ctrl.Result{}, err
+	if uplink.Spec.Master != "" {
+		if err := r.setUplinkMaster(uplinkName, uplink.Spec.Master); err != nil {
+			logrus.Errorf("set uplink to master fail %v", err)
+			return ctrl.Result{}, err
+		}
 	}
 
 	if err := r.setUplinkNetDevUp(ctx, uplink, uplinkName); err != nil {
