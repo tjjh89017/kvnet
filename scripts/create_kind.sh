@@ -3,6 +3,7 @@
 kind delete cluster --name kvnet-test
 kind create cluster --config kind.yaml --name kvnet-test
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v4.0.1/deployments/multus-daemonset-thick.yml
 
 docker exec -t kvnet-test-control-plane ip link add nic0 type veth peer name outnic0
 docker exec -t kvnet-test-worker ip link add nic0 type veth peer name outnic0
