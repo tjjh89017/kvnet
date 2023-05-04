@@ -22,14 +22,27 @@ import (
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+const (
+	UplinkConfigFinalizer      = "uplinkconfig.kvnet.kojuro.date/finalizer"
+	UplinkConfigNamespaceLabel = "uplinkconfig.kvnet.kojuro.date/namespace"
+	UplinkConfigNameLabel      = "uplinkconfig.kvnet.kojuro.date/name"
+	UplinkConfigNodeLabel      = "uplinkconfig.kvnet.kojuro.date/node"
+)
 
 // UplinkConfigSpec defines the desired state of UplinkConfig
 type UplinkConfigSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	// Foo is an example field of UplinkConfig. Edit uplinkconfig_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	NodeSelector *metav1.LabelSelector `json:"selector,omitempty"`
+	BondName     string                `json:"bond,omitempty"`
+	Template     UplinkTemplateSpec    `json:"template,omitempty"`
+}
+
+// UplinkTemplateSpec
+type UplinkTemplateSpec struct {
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+	Spec              UplinkSpec `json:"spec,omitempty"`
 }
 
 // UplinkConfigStatus defines the observed state of UplinkConfig

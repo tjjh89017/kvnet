@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
@@ -43,6 +44,9 @@ func (r *UplinkConfig) Default() {
 	uplinkconfiglog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
+	if r.GetDeletionTimestamp() == nil {
+		controllerutil.AddFinalizer(r, UplinkConfigFinalizer)
+	}
 }
 
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.

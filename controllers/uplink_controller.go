@@ -18,10 +18,18 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/sirupsen/logrus"
+	"os"
+	"os/exec"
+	"strings"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
@@ -47,11 +55,231 @@ type UplinkReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *UplinkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqLogger := log.FromContext(ctx)
+	reqLogger.Info("Reconciling Uplink")
 
-	// TODO(user): your logic here
+	uplink := &kvnetv1alpha1.Uplink{}
+	if err := r.Get(ctx, req.NamespacedName, uplink); err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Uplink resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		reqLogger.Error(err, "Failed to get Uplink")
+		return ctrl.Result{}, err
+	}
+
+	// check this file is this node
+	nodeName := os.Getenv("NODENAME")
+	tmpName := strings.Split(uplink.Name, ".")
+	if len(tmpName) < 2 {
+		return ctrl.Result{}, fmt.Errorf("error to parse uplink name: %v", uplink.Name)
+	}
+	uplinkNodeName := tmpName[0]
+	uplinkName := tmpName[1]
+	if uplinkNodeName != nodeName {
+		// not ours, skip it
+		logrus.Infof("skip uplink %s", uplink.Name)
+		return ctrl.Result{}, nil
+	}
+
+	if uplink.GetDeletionTimestamp() != nil {
+		if !controllerutil.ContainsFinalizer(uplink, kvnetv1alpha1.UplinkFinalizer) {
+			logrus.Info("already onRemove")
+			return ctrl.Result{}, nil
+		}
+
+		if result, err := r.OnRemove(ctx, uplink, uplinkName); err != nil {
+			return result, err
+		}
+
+		logrus.Info("remove finalizer")
+		controllerutil.RemoveFinalizer(uplink, kvnetv1alpha1.UplinkFinalizer)
+		if err := r.Update(ctx, uplink); err != nil {
+			logrus.Errorf("remove finalizer fail %v", err)
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	return r.OnChange(ctx, uplink, uplinkName)
+}
+
+func (r *UplinkReconciler) OnChange(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) (ctrl.Result, error) {
+	logrus.Info("OnChange")
+
+	if err := r.findUplinkNetDev(ctx, uplink, uplinkName); err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
+			logrus.Errorf("fail to find uplink net dev %v", err)
+			return ctrl.Result{}, err
+		}
+		// not found, create uplink
+		if err := r.addUplinkNetDev(ctx, uplink, uplinkName); err != nil {
+			logrus.Errorf("fail to add uplink %s: %v", uplinkName, err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	currentMode, err := r.getUplinkNetDevMode(ctx, uplink, uplinkName)
+	if err != nil {
+		logrus.Errorf("get uplink mode fail %v", err)
+		return ctrl.Result{}, err
+	}
+	if currentMode != uplink.Spec.BondMode {
+		if err := r.setUplinkNetDevDown(ctx, uplink, uplinkName); err != nil {
+			logrus.Errorf("set uplink down fail %v", err)
+			return ctrl.Result{}, err
+		}
+
+		if err := r.setUplinkNetDevMode(ctx, uplink, uplinkName); err != nil {
+			logrus.Errorf("set uplink mode fail %v", err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	if err := r.setUplinkNetDevSlaves(ctx, uplink, uplinkName); err != nil {
+		logrus.Errorf("set slave to bond fail %v", err)
+		return ctrl.Result{}, err
+	}
+
+	// set bond master to bridge
+	if err := r.setUplinkMaster(uplinkName, uplink.Spec.Master); err != nil {
+		logrus.Errorf("set uplink to master fail %v", err)
+		return ctrl.Result{}, err
+	}
+
+	if err := r.setUplinkNetDevUp(ctx, uplink, uplinkName); err != nil {
+		logrus.Errorf("fail to set uplink %s up: %v", uplinkName, err)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
+}
+
+func (r *UplinkReconciler) OnRemove(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) (ctrl.Result, error) {
+	logrus.Info("OnRemove")
+
+	err := r.delUplinkNetDev(ctx, uplink, uplinkName)
+	if err != nil {
+		logrus.Errorf("del uplink net dev error %v", err)
+	}
+	return ctrl.Result{}, err
+}
+
+func (r *UplinkReconciler) findUplinkNetDev(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	cmd := exec.Command("ip", "-j", "link", "show", "dev", uplinkName)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) addUplinkNetDev(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	cmd := exec.Command("ip", "link", "add", uplinkName, "type", "bond")
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) delUplinkNetDev(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	cmd := exec.Command("ip", "link", "del", uplinkName)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setUplinkNetDevUp(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	cmd := exec.Command("ip", "link", "set", uplinkName, "up")
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setUplinkNetDevDown(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	cmd := exec.Command("ip", "link", "set", uplinkName, "down")
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) getUplinkNetDevMode(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) (string, error) {
+	cmd := exec.Command("ip", "-j", "-d", "link", "show", uplinkName)
+	cmd.Env = os.Environ()
+	output, err := cmd.Output()
+
+	if err != nil {
+		return "", err
+	}
+
+	var intf []map[string]interface{}
+	json.Unmarshal([]byte(output), &intf)
+	linkinfo := intf[0]["linkinfo"].(map[string]interface{})
+	infodata := linkinfo["info_data"].(map[string]interface{})
+	mode := infodata["mode"].(string)
+	return mode, nil
+}
+
+func (r *UplinkReconciler) setUplinkNetDevMode(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	cmd := exec.Command("ip", "link", "set", uplinkName, "type", "bond", "mode", uplink.Spec.BondMode)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setUplinkNetDevSlaves(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+
+	for _, slave := range uplink.Spec.BondSlaves {
+		// check bondslaves has master
+		if err := r.getSlavesMaster(slave); err != nil {
+			return err
+		}
+		// set bondslave to down
+		if err := r.setSalvesDown(slave); err != nil {
+			return err
+		}
+		// set bondslave to bond
+		if err := r.setSlavesMaster(slave, uplinkName); err != nil {
+			return err
+		}
+		// set bondslave to up
+		if err := r.setSalvesUp(slave); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *UplinkReconciler) getSlavesMaster(slave string) error {
+	cmd := exec.Command("ip", "-j", "link", "show", slave)
+	cmd.Env = os.Environ()
+	output, err := cmd.Output()
+
+	if err != nil {
+		return err
+	}
+
+	var intf []map[string]string
+	json.Unmarshal([]byte(output), &intf)
+	if _, ok := intf[0]["master"]; ok {
+		return fmt.Errorf("%s has master", slave)
+	}
+	return nil
+}
+
+func (r *UplinkReconciler) setSlavesMaster(slave string, uplink string) error {
+	cmd := exec.Command("ip", "link", "set", slave, "master", uplink)
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setSalvesDown(slave string) error {
+	cmd := exec.Command("ip", "link", "set", slave, "down")
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setSalvesUp(slave string) error {
+	cmd := exec.Command("ip", "link", "set", slave, "up")
+	cmd.Env = os.Environ()
+	return cmd.Run()
+}
+
+func (r *UplinkReconciler) setUplinkMaster(uplink string, master string) error {
+	cmd := exec.Command("ip", "link", "set", uplink, "master", master)
+	cmd.Env = os.Environ()
+	return cmd.Run()
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -83,3 +83,55 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - uplinkconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - uplinkconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - uplinkconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - uplinks
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - uplinks/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - uplinks/status
+  verbs:
+  - get
+  - patch
+  - update

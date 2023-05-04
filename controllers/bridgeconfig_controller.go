@@ -187,7 +187,7 @@ func (r *BridgeConfigReconciler) addBridge(ctx context.Context, nodeName string,
 	}
 	bridge.Labels[kvnetv1alpha1.BridgeConfigNamespaceLabel] = bridgeConfig.Namespace
 	bridge.Labels[kvnetv1alpha1.BridgeConfigNameLabel] = bridgeConfig.Name
-	bridge.Labels[kvnetv1alpha1.NodeLabel] = nodeName
+	bridge.Labels[kvnetv1alpha1.BridgeConfigNodeLabel] = nodeName
 
 	return r.Create(ctx, bridge)
 }
@@ -239,7 +239,7 @@ func (r *BridgeConfigReconciler) findBridge(ctx context.Context, nodeName string
 
 	if nodeName != "" {
 		opts = append(opts, client.MatchingLabels{
-			kvnetv1alpha1.NodeLabel: nodeName,
+			kvnetv1alpha1.BridgeConfigNodeLabel: nodeName,
 		})
 	}
 

@@ -9,4 +9,17 @@ metadata:
     app.kubernetes.io/created-by: kvnet
   name: uplinkconfig-sample
 spec:
+  selector:
+    matchExpressions:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: DoesNotExist
+  bond: bond0 
+  template:
+    spec:
+      mode: "active-backup"
+      slaves:
+      - nic0
+      - nic1
+      master: br0
+
   # TODO(user): Add fields here

@@ -45,6 +45,46 @@ webhooks:
     resources:
     - bridgeconfigs
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-kvnet-kojuro-date-v1alpha1-uplink
+  failurePolicy: Fail
+  name: muplink.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - uplinks
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-kvnet-kojuro-date-v1alpha1-uplinkconfig
+  failurePolicy: Fail
+  name: muplinkconfig.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - uplinkconfigs
+  sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -91,4 +131,44 @@ webhooks:
     - UPDATE
     resources:
     - bridgeconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-kvnet-kojuro-date-v1alpha1-uplink
+  failurePolicy: Fail
+  name: vuplink.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - uplinks
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-kvnet-kojuro-date-v1alpha1-uplinkconfig
+  failurePolicy: Fail
+  name: vuplinkconfig.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - uplinkconfigs
   sideEffects: None

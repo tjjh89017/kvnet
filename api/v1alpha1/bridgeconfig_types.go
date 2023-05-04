@@ -23,10 +23,10 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 const (
-	BridgeConfigFinalizer      = "kvnet.kojuro.date/finalizer"
+	BridgeConfigFinalizer      = "bridgeconfig.kvnet.kojuro.date/finalizer"
 	BridgeConfigNamespaceLabel = "bridgeconfig.kvnet.kojuro.date/namespace"
 	BridgeConfigNameLabel      = "bridgeconfig.kvnet.kojuro.date/name"
-	NodeLabel                  = "bridgeconfig.kvnet.kojuro.date/node"
+	BridgeConfigNodeLabel      = "bridgeconfig.kvnet.kojuro.date/node"
 )
 
 // BridgeConfigSpec defines the desired state of BridgeConfig
