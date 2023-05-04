@@ -2,4 +2,6 @@
 resources:
 - kvnet_v1alpha1_bridgeconfig.yaml
 - kvnet_v1alpha1_bridge.yaml
+- kvnet_v1alpha1_uplinkconfig.yaml
+- kvnet_v1alpha1_uplink.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples
