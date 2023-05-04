@@ -319,7 +319,7 @@ func (r *UplinkReconciler) setUplinkNodeLabel(ctx context.Context, uplink *kvnet
 		nodeCopy.Labels = make(map[string]string)
 	}
 
-	nodeCopy.Labels[kvnetv1alpha1.UplinkNodeLabel+uplinkName] = uplink.Spec.Master
+	nodeCopy.Labels[kvnetv1alpha1.UplinkNodeLabel+uplinkName] = r.checkIfMasterIsBridge(uplink.Spec.Master)
 	if !reflect.DeepEqual(node, nodeCopy) {
 		if err := r.Update(ctx, nodeCopy); err != nil {
 			logrus.Errorf("update node label failed %v", err)
@@ -351,6 +351,28 @@ func (r *UplinkReconciler) delUplinkNodeLabel(ctx context.Context, uplink *kvnet
 		}
 	}
 	return nil
+}
+
+func (r *UplinkReconciler) checkIfMasterIsBridge(master string) string {
+	// if master is bridge, return bridge name
+	// otherwise empty string
+	cmd := exec.Command("ip", "-j", "-d", "link", "show", master)
+	cmd.Env = os.Environ()
+	output, err := cmd.Output()
+
+	if err != nil {
+		return "", err
+	}
+
+	var intf []map[string]interface{}
+	json.Unmarshal([]byte(output), &intf)
+	linkinfo := intf[0]["linkinfo"].(map[string]interface{})
+	infokind := linkinfo["info_kind"].(string)
+
+	if infokind == "bridge" {
+		return master
+	}
+	return ""
 }
 
 // SetupWithManager sets up the controller with the Manager.
