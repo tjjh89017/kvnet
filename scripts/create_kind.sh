@@ -1,4 +1,4 @@
-#!.bin/bash
+#!/bin/bash
 
 kind delete cluster --name kvnet-test
 kind create cluster --config kind.yaml --name kvnet-test
