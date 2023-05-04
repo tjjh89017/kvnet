@@ -218,10 +218,12 @@ func (r *BridgeConfigReconciler) updateBridge(ctx context.Context, nodeName stri
 		bridge.Labels[kvnetv1alpha1.BridgeConfigNameLabel] != bridgeConfig.Name {
 		return fmt.Errorf("bridge %s is not belong to this bridgeConfig", bridge.Name)
 	}
+
+	bridgeCopy := bridge.DeepCopy()
+	bridgeCopy.Spec = *bridgeConfig.Spec.Template.Spec.DeepCopy()
 	// It should be only one
-	if !reflect.DeepEqual(bridge.Spec, bridgeConfig.Spec.Template.Spec) {
-		bridge.Spec = bridgeConfig.Spec.Template.Spec
-		if err := r.Update(ctx, bridge); err != nil {
+	if !reflect.DeepEqual(bridge, bridgeCopy) {
+		if err := r.Update(ctx, bridgeCopy); err != nil {
 			return err
 		}
 	}

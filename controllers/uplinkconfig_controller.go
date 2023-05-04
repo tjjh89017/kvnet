@@ -218,10 +218,12 @@ func (r *UplinkConfigReconciler) updateUplink(ctx context.Context, nodeName stri
 		uplink.Labels[kvnetv1alpha1.UplinkConfigNameLabel] != uplinkConfig.Name {
 		return fmt.Errorf("uplink %s is not belong to this uplinkConfig", uplink.Name)
 	}
+
+	uplinkCopy := uplink.DeepCopy()
+	uplinkCopy.Spec = *uplinkConfig.Spec.Template.Spec.DeepCopy()
 	// It should be only one
-	if !reflect.DeepEqual(uplink.Spec, uplinkConfig.Spec.Template.Spec) {
-		uplink.Spec = uplinkConfig.Spec.Template.Spec
-		if err := r.Update(ctx, uplink); err != nil {
+	if !reflect.DeepEqual(uplink, uplinkCopy) {
+		if err := r.Update(ctx, uplinkCopy); err != nil {
 			return err
 		}
 	}

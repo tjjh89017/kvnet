@@ -33,7 +33,10 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
 )
@@ -47,6 +50,9 @@ type UplinkReconciler struct {
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=uplinks,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=uplinks/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=uplinks/finalizers,verbs=update
+//+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=bridges,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=bridges/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=bridges/finalizers,verbs=update
 //+kubebuilder:rbac:groups=core,resources=nodes,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=nodes/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=nodes/finalizers,verbs=update
@@ -234,9 +240,43 @@ func (r *UplinkReconciler) setUplinkNetDevMode(ctx context.Context, uplink *kvne
 	return cmd.Run()
 }
 
+func (r *UplinkReconciler) getUplinkNetDevSlaves(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) ([]string, error) {
+	cmd := exec.Command("ip", "-j", "link", "show", "master", uplinkName)
+	cmd.Env = os.Environ()
+	output, err := cmd.Output()
+
+	if err != nil {
+		logrus.Errorf("get uplink current slave failed %v", err)
+		return nil, err
+	}
+
+	var intf []map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &intf); err != nil {
+		logrus.Errorf("json Unmarshal failed %v", err)
+		return nil, err
+	}
+	var slaves []string
+
+	for _, i := range intf {
+		slaves = append(slaves, i["ifname"].(string))
+	}
+	return slaves, nil
+}
+
 func (r *UplinkReconciler) setUplinkNetDevSlaves(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	currentSlaves, err := r.getUplinkNetDevSlaves(ctx, uplink, uplinkName)
+	if err != nil {
+		return err
+	}
+
+	slavesMap := make(map[string]int)
+	for _, slave := range currentSlaves {
+		slavesMap[slave] = 1
+	}
 
 	for _, slave := range uplink.Spec.BondSlaves {
+		delete(slavesMap, slave)
+
 		// check bondslaves has master
 		master := r.getSlavesMaster(slave)
 		switch master {
@@ -259,6 +299,15 @@ func (r *UplinkReconciler) setUplinkNetDevSlaves(ctx context.Context, uplink *kv
 			return fmt.Errorf("slave %s has other master", slave)
 		}
 	}
+
+	// delete remain slave
+	for slave, _ := range slavesMap {
+		if err := r.setSlavesMaster(slave, ""); err != nil {
+			logrus.Errorf("faile to set slave to nomaster %v", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -271,16 +320,22 @@ func (r *UplinkReconciler) getSlavesMaster(slave string) string {
 		return ""
 	}
 
-	var intf []map[string]string
-	json.Unmarshal([]byte(output), &intf)
+	var intf []map[string]interface{}
+	if err := json.Unmarshal([]byte(output), &intf); err != nil {
+		logrus.Errorf("json Unmarshal failed %v", err)
+		return ""
+	}
 	if m, ok := intf[0]["master"]; ok {
-		return m
+		return m.(string)
 	}
 	return ""
 }
 
 func (r *UplinkReconciler) setSlavesMaster(slave string, uplink string) error {
-	cmd := exec.Command("ip", "link", "set", slave, "master", uplink)
+	cmd := exec.Command("ip", "link", "set", slave, "nomaster")
+	if uplink != "" {
+		cmd = exec.Command("ip", "link", "set", slave, "master", uplink)
+	}
 	cmd.Env = os.Environ()
 	return cmd.Run()
 }
@@ -361,7 +416,7 @@ func (r *UplinkReconciler) checkIfMasterIsBridge(master string) string {
 	output, err := cmd.Output()
 
 	if err != nil {
-		return "", err
+		return ""
 	}
 
 	var intf []map[string]interface{}
@@ -379,5 +434,31 @@ func (r *UplinkReconciler) checkIfMasterIsBridge(master string) string {
 func (r *UplinkReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kvnetv1alpha1.Uplink{}).
+		Watches(
+			&source.Kind{Type: &kvnetv1alpha1.Bridge{}},
+			handler.EnqueueRequestsFromMapFunc(r.UplinkBridgeWatchMap),
+		).
 		Complete(r)
+}
+
+func (r *UplinkReconciler) UplinkBridgeWatchMap(obj client.Object) []reconcile.Request {
+	requests := []reconcile.Request{}
+
+	uplinks := &kvnetv1alpha1.UplinkList{}
+	if err := r.List(context.Background(), uplinks); err != nil {
+		logrus.Errorf("cannot reconcile uplink for bridge change")
+		return requests
+	}
+
+	for _, uplink := range uplinks.Items {
+		requests = append(requests,
+			reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      uplink.Name,
+					Namespace: uplink.Namespace,
+				},
+			},
+		)
+	}
+	return requests
 }

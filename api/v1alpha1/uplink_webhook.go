@@ -17,8 +17,15 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -27,7 +34,12 @@ import (
 // log is for logging in this package.
 var uplinklog = logf.Log.WithName("uplink-resource")
 
+// TODO wait for operator-sdk and controller-runtime update to support https://github.com/kubernetes-sigs/controller-runtime/tree/8770b4d3b5425b156f48c971ee140ea25f9c1bfa/examples/builtins
+// workaround from https://github.com/kubernetes-sigs/kubebuilder/issues/1216#issuecomment-559570858
+var uplinkCleint client.Client
+
 func (r *Uplink) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	uplinkCleint = mgr.GetClient()
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -59,6 +71,31 @@ func (r *Uplink) ValidateCreate() error {
 	uplinklog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
+	tmpList := strings.Split(r.Name, ".")
+	if len(tmpList) < 2 {
+		return fmt.Errorf("name should be <node>.<bond> format")
+	}
+	nodeName := tmpList[0]
+	bondName := tmpList[1]
+	bridgeName := r.Spec.Master
+
+	node := &corev1.Node{}
+	if err := uplinkCleint.Get(context.TODO(), types.NamespacedName{Name: nodeName}, node); err != nil {
+		return fmt.Errorf("failed to get node %v", err)
+	}
+
+	if node.Labels == nil {
+		// ok
+		return nil
+	}
+
+	label := UplinkNodeLabel + bondName
+	for k, v := range node.Labels {
+		if strings.HasPrefix(k, UplinkNodeLabel) && k != label && v == bridgeName {
+			return fmt.Errorf("There is another uplink with the same bridge %s", bridgeName)
+		}
+	}
+
 	return nil
 }
 
@@ -67,6 +104,31 @@ func (r *Uplink) ValidateUpdate(old runtime.Object) error {
 	uplinklog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
+	tmpList := strings.Split(r.Name, ".")
+	if len(tmpList) < 2 {
+		return fmt.Errorf("name should be <node>.<bond> format")
+	}
+	nodeName := tmpList[0]
+	bondName := tmpList[1]
+	bridgeName := r.Spec.Master
+
+	node := &corev1.Node{}
+	if err := uplinkCleint.Get(context.TODO(), types.NamespacedName{Name: nodeName}, node); err != nil {
+		return fmt.Errorf("failed to get node %v", err)
+	}
+
+	if node.Labels == nil {
+		// ok
+		return nil
+	}
+
+	label := UplinkNodeLabel + bondName
+	for k, v := range node.Labels {
+		if strings.HasPrefix(k, UplinkNodeLabel) && k != label && v == bridgeName {
+			return fmt.Errorf("There is another uplink with the same bridge %s", bridgeName)
+		}
+	}
+
 	return nil
 }
 
