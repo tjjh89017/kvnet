@@ -5,6 +5,13 @@ metadata:
   annotations:
     k8s.v1.cni.cncf.io/networks: br0-conf
 spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: bridge.kvnet.kojuro.date/br0
+            operator: Exists
   containers:
   - name: samplepod
     command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
