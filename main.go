@@ -34,6 +34,8 @@ import (
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
 	"github.com/tjjh89017/kvnet/controllers"
 	//+kubebuilder:scaffold:imports
+
+	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 )
 
 var (
@@ -46,6 +48,9 @@ func init() {
 
 	utilruntime.Must(kvnetv1alpha1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	// 3rd party
+	utilruntime.Must(nadv1.AddToScheme(scheme))
 }
 
 func main() {
@@ -107,6 +112,7 @@ func main() {
 			os.Exit(1)
 		}
 	} else {
+		// Reconciler
 		if err = (&controllers.BridgeConfigReconciler{
 			Client: mgr.GetClient(),
 			Scheme: mgr.GetScheme(),
@@ -114,19 +120,21 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "BridgeConfig")
 			os.Exit(1)
 		}
+		if err = (&controllers.UplinkConfigReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "UplinkConfig")
+			os.Exit(1)
+		}
+
+		// Webhook
 		if err = (&kvnetv1alpha1.BridgeConfig{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "BridgeConfig")
 			os.Exit(1)
 		}
 		if err = (&kvnetv1alpha1.Bridge{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Bridge")
-			os.Exit(1)
-		}
-		if err = (&controllers.UplinkConfigReconciler{
-			Client: mgr.GetClient(),
-			Scheme: mgr.GetScheme(),
-		}).SetupWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create controller", "controller", "UplinkConfig")
 			os.Exit(1)
 		}
 		if err = (&kvnetv1alpha1.UplinkConfig{}).SetupWebhookWithManager(mgr); err != nil {
@@ -137,6 +145,8 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Uplink")
 			os.Exit(1)
 		}
+
+		// unsorted
 		//+kubebuilder:scaffold:builder
 	}
 

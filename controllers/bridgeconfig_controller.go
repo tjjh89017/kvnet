@@ -29,10 +29,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
@@ -258,6 +261,7 @@ func (r *BridgeConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(
 			&source.Kind{Type: &corev1.Node{}},
 			handler.EnqueueRequestsFromMapFunc(r.BridgeConfigNodeWatchMap),
+			builder.WithPredicates(r.BridgeConfigNodePredicates()),
 		).
 		Complete(r)
 }
@@ -282,4 +286,13 @@ func (r *BridgeConfigReconciler) BridgeConfigNodeWatchMap(obj client.Object) []r
 		)
 	}
 	return requests
+}
+
+func (r *BridgeConfigReconciler) BridgeConfigNodePredicates() predicate.Predicate {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			logrus.Infof("e %v %v", e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
+			return !reflect.DeepEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
+		},
+	}
 }
