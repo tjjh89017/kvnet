@@ -9,10 +9,7 @@ metadata:
     app.kubernetes.io/created-by: kvnet
   name: bridgeconfig-sample
 spec:
-  selector:
-    matchExpressions:
-      - key: "node-role.kubernetes.io/control-plane"
-        operator: DoesNotExist
+  selector: {}
   bridge: br0
   template:
     spec:

@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sampledeployment
+  labels:
+    app: sampledeployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sampledeployment
+  template:
+    metadata:
+      labels:
+        app: sampledeployment
+      annotations:
+        k8s.v1.cni.cncf.io/networks: br0-conf
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: bridge.kvnet.kojuro.date/br0
+                operator: Exists
+      containers:
+      - name: samplepod
+        command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
+        image: alpine
