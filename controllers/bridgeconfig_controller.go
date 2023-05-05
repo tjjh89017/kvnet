@@ -291,7 +291,6 @@ func (r *BridgeConfigReconciler) BridgeConfigNodeWatchMap(obj client.Object) []r
 func (r *BridgeConfigReconciler) BridgeConfigNodePredicates() predicate.Predicate {
 	return predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			logrus.Infof("e %v %v", e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
 			return !reflect.DeepEqual(e.ObjectOld.GetLabels(), e.ObjectNew.GetLabels())
 		},
 	}
