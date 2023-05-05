@@ -3,6 +3,7 @@ module github.com/tjjh89017/kvnet
 go 1.19
 
 require (
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/onsi/ginkgo/v2 v2.6.0
 	github.com/onsi/gomega v1.24.1
 	github.com/sirupsen/logrus v1.8.1
