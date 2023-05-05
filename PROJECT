@@ -63,4 +63,8 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- controller: true
+  group: k8s.cni.cncf.io
+  kind: NetworkAttachmentDefinition
+  version: v1
 version: "3"

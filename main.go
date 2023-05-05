@@ -33,6 +33,7 @@ import (
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
 	"github.com/tjjh89017/kvnet/controllers"
+
 	//+kubebuilder:scaffold:imports
 
 	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
@@ -125,6 +126,13 @@ func main() {
 			Scheme: mgr.GetScheme(),
 		}).SetupWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create controller", "controller", "UplinkConfig")
+			os.Exit(1)
+		}
+		if err = (&controllers.NetworkAttachmentDefinitionReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "NetworkAttachmentDefinition")
 			os.Exit(1)
 		}
 
