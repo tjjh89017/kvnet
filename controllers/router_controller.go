@@ -155,10 +155,49 @@ func (r *RouterReconciler) OnRemove(ctx context.Context, router *kvnetv1alpha1.R
 	logrus.Infof("Router OnRemove")
 
 	// remove all deployment
+	deployment := &appv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, deployment); err != nil {
+		if !errors.IsNotFound(err) {
+			logrus.Errorf("remove: get deployment failed %v", err)
+			return ctrl.Result{}, err
+		}
+	} else if err := r.Delete(ctx, deployment); err != nil {
+		logrus.Errorf("remove: delete deployment failed %v", err)
+		return ctrl.Result{}, err
+	}
 
 	// remove all configMap
+	configMap := &corev1.ConfigMap{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, configMap); err != nil {
+		if !errors.IsNotFound(err) {
+			logrus.Errorf("remove: get configMap failed %v", err)
+			return ctrl.Result{}, err
+		}
+	} else if err := r.Delete(ctx, deployment); err != nil {
+		logrus.Errorf("remove: delete configMap failed %v", err)
+		return ctrl.Result{}, err
+	}
 
 	// remove subnets labels
+	for _, subnetName := range router.Spec.Subnets {
+		subnet := &kvnetv1alpha1.Subnet{}
+		if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: subnetName.Name}, subnet); err != nil {
+			if !errors.IsNotFound(err) {
+				logrus.Errorf("remove: get subnet failed %s", err)
+				return ctrl.Result{}, err
+			}
+		} else if subnet.Labels[kvnetv1alpha1.RouterSubnetOwnerLabel] == router.Name {
+			// found
+			subnetCopy := subnet.DeepCopy()
+			delete(subnetCopy.Labels, kvnetv1alpha1.RouterSubnetOwnerLabel)
+			if !reflect.DeepEqual(subnet, subnetCopy) {
+				if err := r.Update(ctx, subnetCopy); err != nil {
+					logrus.Errorf("remove: delete subnet labels failed %v", err)
+					return ctrl.Result{}, err
+				}
+			}
+		}
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -448,6 +487,9 @@ func (r *RouterReconciler) updateSubnetLabel(ctx context.Context, router *kvnetv
 			if subnet.Labels == nil {
 				subnet.Labels = make(map[string]string)
 			}
+
+			// TODO check subnet.Labels[kvnetv1alpha1.RouterSubnetOwnerLabel] value befor setting
+
 			subnet.Labels[kvnetv1alpha1.RouterSubnetOwnerLabel] = router.Name
 			if err := r.Update(ctx, subnet); err != nil {
 				logrus.Errorf("add router label to subnet fail %v", err)
