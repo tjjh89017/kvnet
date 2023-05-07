@@ -173,7 +173,7 @@ func (r *RouterReconciler) OnRemove(ctx context.Context, router *kvnetv1alpha1.R
 			logrus.Errorf("remove: get configMap failed %v", err)
 			return ctrl.Result{}, err
 		}
-	} else if err := r.Delete(ctx, deployment); err != nil {
+	} else if err := r.Delete(ctx, configMap); err != nil {
 		logrus.Errorf("remove: delete configMap failed %v", err)
 		return ctrl.Result{}, err
 	}
