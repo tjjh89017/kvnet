@@ -174,12 +174,16 @@ func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1
 		needCreate = true
 		replicas := int32(1)
 		privileged := true
+		routerKind := reflect.TypeOf(kvnetv1alpha1.Router{}).Name()
 		deployment = &appv1.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: router.Namespace,
 				Name:      router.Name,
 				Labels: map[string]string{
 					"app": router.Name,
+				},
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(router, kvnetv1alpha1.GroupVersion.WithKind(routerKind)),
 				},
 			},
 			Spec: appv1.DeploymentSpec{
@@ -315,8 +319,16 @@ func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1a
 			logrus.Errorf("get configMap failed %v", err)
 			return err
 		}
-		configMap.Namespace = router.Namespace
-		configMap.Name = router.Name
+		routerKind := reflect.TypeOf(kvnetv1alpha1.Router{}).Name()
+		configMap = &corev1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: router.Namespace,
+				Name:      router.Name,
+				OwnerReferences: []metav1.OwnerReference{
+					*metav1.NewControllerRef(router, kvnetv1alpha1.GroupVersion.WithKind(routerKind)),
+				},
+			},
+		}
 
 		if err := r.Create(ctx, configMap); err != nil {
 			logrus.Errorf("create default configMap fail %v", err)
