@@ -198,8 +198,9 @@ func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1
 					Spec: corev1.PodSpec{
 						InitContainers: []corev1.Container{
 							{
-								Name:  "init-container",
-								Image: "tjjh89017/alpine-nettools",
+								Name:            "init-container",
+								Image:           "tjjh89017/alpine-nettools",
+								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command: []string{
 									"/bin/sh",
 									"-c",
@@ -212,8 +213,9 @@ func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1
 						},
 						Containers: []corev1.Container{
 							{
-								Name:  "config-map-notify",
-								Image: "tjjh89017/alpine-nettools",
+								Name:            "config-map-notify",
+								Image:           "tjjh89017/alpine-nettools",
+								ImagePullPolicy: corev1.PullIfNotPresent,
 								Command: []string{
 									"/bin/sh",
 									"-c",
