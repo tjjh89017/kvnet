@@ -29,14 +29,14 @@ type SubnetSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	BridgeName string `json:"bridge,omitempty"`
-	CIDR string `json:"cidr,omitempty"`
-	RouterIP string `json:"cidr,omitempty"`
+	CIDR       string `json:"cidr,omitempty"`
+	RouterIP   string `json:"routerIP,omitempty"`
 
 	DHCP *DhcpOption `json:"dhcp,omitempty"`
 }
 
 type DhcpOption struct {
-	Enable bool `json:"enable,omitempty"`
+	Enable       bool   `json:"enable,omitempty"`
 	DhcpServerIP string `json:"serverIP,omitempty"`
 }
 

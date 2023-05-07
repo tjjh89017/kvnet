@@ -112,6 +112,32 @@ rules:
 - apiGroups:
   - kvnet.kojuro.date
   resources:
+  - subnets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - subnets/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - subnets/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
   - uplinkconfigs
   verbs:
   - create
