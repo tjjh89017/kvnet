@@ -135,6 +135,13 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "NetworkAttachmentDefinition")
 			os.Exit(1)
 		}
+		if err = (&controllers.SubnetReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Subnet")
+			os.Exit(1)
+		}
 
 		// Webhook
 		if err = (&kvnetv1alpha1.BridgeConfig{}).SetupWebhookWithManager(mgr); err != nil {

@@ -1,0 +1,31 @@
+# permissions for end users to edit subnets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: subnet-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: kvnet
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+  name: subnet-editor-role
+rules:
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - subnets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - subnets/status
+  verbs:
+  - get

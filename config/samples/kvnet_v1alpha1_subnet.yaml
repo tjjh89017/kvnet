@@ -1,0 +1,12 @@
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: Subnet
+metadata:
+  labels:
+    app.kubernetes.io/name: subnet
+    app.kubernetes.io/instance: subnet-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: subnet-sample
+spec:
+  # TODO(user): Add fields here
