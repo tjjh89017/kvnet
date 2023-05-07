@@ -1,15 +1,14 @@
 apiVersion: kvnet.kojuro.date/v1alpha1
-kind: Subnet
+kind: Router
 metadata:
   labels:
-    app.kubernetes.io/name: subnet
-    app.kubernetes.io/instance: subnet-sample
+    app.kubernetes.io/name: router
+    app.kubernetes.io/instance: router-sample
     app.kubernetes.io/part-of: kvnet
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: kvnet
-  name: subnet-br0-conf
+  name: router-a
 spec:
-  network: br0-conf
-  cidr: 192.168.0.0/24
-  routerIP: 192.168.0.1
+  subnets:
+    - name: subnet-br0-conf
   # TODO(user): Add fields here

@@ -6,6 +6,11 @@ kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/
 kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v4.0.1/deployments/multus-daemonset.yml
 kubectl apply -f install_cni.yaml
 
+echo "wait for cert-manager"
+kubectl wait deployment -n cert-manager cert-manager --for condition=Available=True --timeout=90s
+kubectl wait deployment -n cert-manager cert-manager-cainjector --for condition=Available=True --timeout=90s
+kubectl wait deployment -n cert-manager cert-manager-webhook --for condition=Available=True --timeout=90s
+
 docker exec -t kvnet-test-control-plane ip link add nic0 type veth peer name outnic0
 docker exec -t kvnet-test-worker ip link add nic0 type veth peer name outnic0
 docker exec -t kvnet-test-worker2 ip link add nic0 type veth peer name outnic0

@@ -23,28 +23,31 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 const (
-	SubnetFinalizer = "subnet.kvnet.kojuro.date/finalizer"
+	RouterFinalizer        = "router.kvnet.kojuro.date/finalizer"
+	RouterSubnetOwnerLabel = "router.kvnet.kojuro.date/owner"
 )
 
-// SubnetSpec defines the desired state of Subnet
-type SubnetSpec struct {
+// RouterSpec defines the desired state of Router
+type RouterSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Network  string `json:"network,omitempty"`
-	CIDR     string `json:"cidr,omitempty"`
-	RouterIP string `json:"routerIP,omitempty"`
+	Subnets []SubnetOption `json:"subnets,omitempty"`
 
-	DHCP *DhcpOption `json:"dhcp,omitempty"`
+	// TODO static route or something
 }
 
-type DhcpOption struct {
-	Enable       bool   `json:"enable,omitempty"`
-	DhcpServerIP string `json:"serverIP,omitempty"`
+type SubnetOption struct {
+	Name string `json:"name,omitempty"`
+
+	// mode: "", "static", "dhcp"
+	IPMode  string `json:"ipMode,omitempty"`
+	IP      string `json:"ip,omitempty"`
+	Gateway string `json:"gateway,omitempty"`
 }
 
-// SubnetStatus defines the observed state of Subnet
-type SubnetStatus struct {
+// RouterStatus defines the observed state of Router
+type RouterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -52,24 +55,24 @@ type SubnetStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// Subnet is the Schema for the subnets API
-type Subnet struct {
+// Router is the Schema for the routers API
+type Router struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   SubnetSpec   `json:"spec,omitempty"`
-	Status SubnetStatus `json:"status,omitempty"`
+	Spec   RouterSpec   `json:"spec,omitempty"`
+	Status RouterStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// SubnetList contains a list of Subnet
-type SubnetList struct {
+// RouterList contains a list of Router
+type RouterList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Subnet `json:"items"`
+	Items           []Router `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Subnet{}, &SubnetList{})
+	SchemeBuilder.Register(&Router{}, &RouterList{})
 }

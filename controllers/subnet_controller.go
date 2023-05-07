@@ -18,10 +18,17 @@ package controllers
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
+	"reflect"
+	"strings"
 
+	nadv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
@@ -36,6 +43,9 @@ type SubnetReconciler struct {
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=subnets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=subnets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=subnets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -47,9 +57,81 @@ type SubnetReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *SubnetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	reqLogger := log.FromContext(ctx)
+	reqLogger.Info("Reconciling Subnet")
 
-	// TODO(user): your logic here
+	subnet := &kvnetv1alpha1.Subnet{}
+	if err := r.Get(ctx, req.NamespacedName, subnet); err != nil {
+		if errors.IsNotFound(err) {
+			reqLogger.Info("Subnet resource not found. Ignoring since object must be deleted")
+			return ctrl.Result{}, nil
+		}
+		reqLogger.Error(err, "Failed to get Subnet")
+		return ctrl.Result{}, err
+	}
+
+	if subnet.GetDeletionTimestamp() != nil {
+		if !controllerutil.ContainsFinalizer(subnet, kvnetv1alpha1.SubnetFinalizer) {
+			logrus.Info("already onRemove")
+			return ctrl.Result{}, nil
+		}
+
+		if result, err := r.OnRemove(ctx, subnet); err != nil {
+			return result, err
+		}
+
+		controllerutil.RemoveFinalizer(subnet, kvnetv1alpha1.SubnetFinalizer)
+		if err := r.Update(ctx, subnet); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	}
+
+	return r.OnChange(ctx, subnet)
+}
+
+func (r *SubnetReconciler) OnChange(ctx context.Context, subnet *kvnetv1alpha1.Subnet) (ctrl.Result, error) {
+	logrus.Infof("Subnet OnChange")
+	subnetCopy := subnet.DeepCopy()
+
+	if subnetCopy.Labels == nil {
+		subnetCopy.Labels = make(map[string]string)
+	}
+
+	nad := &nadv1.NetworkAttachmentDefinition{}
+	network := subnetCopy.Spec.Network
+	if err := r.Get(ctx, types.NamespacedName{Namespace: subnetCopy.Namespace, Name: network}, nad); err != nil {
+		logrus.Errorf("get nad failed %v", err)
+		return ctrl.Result{}, err
+	}
+
+	// remove all labels
+	for k, _ := range subnetCopy.Labels {
+		if strings.HasPrefix(k, kvnetv1alpha1.BridgeNodeLabel) {
+			delete(subnetCopy.Labels, k)
+		}
+	}
+
+	// add labels
+	for k, _ := range nad.Labels {
+		if strings.HasPrefix(k, kvnetv1alpha1.BridgeNodeLabel) {
+			// setup a label
+			subnetCopy.Labels[k] = ""
+		}
+	}
+
+	if !reflect.DeepEqual(subnet, subnetCopy) {
+		if err := r.Update(ctx, subnetCopy); err != nil {
+			logrus.Errorf("update subnet labels failed %v", err)
+			return ctrl.Result{}, err
+		}
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *SubnetReconciler) OnRemove(ctx context.Context, subnet *kvnetv1alpha1.Subnet) (ctrl.Result, error) {
+	logrus.Infof("Subnet OnRemove")
 
 	return ctrl.Result{}, nil
 }

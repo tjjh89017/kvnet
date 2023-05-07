@@ -5,20 +5,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
-  name: subnets.kvnet.kojuro.date
+  name: routers.kvnet.kojuro.date
 spec:
   group: kvnet.kojuro.date
   names:
-    kind: Subnet
-    listKind: SubnetList
-    plural: subnets
-    singular: subnet
+    kind: Router
+    listKind: RouterList
+    plural: routers
+    singular: router
   scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Subnet is the Schema for the subnets API
+        description: Router is the Schema for the routers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -33,24 +33,25 @@ spec:
           metadata:
             type: object
           spec:
-            description: SubnetSpec defines the desired state of Subnet
+            description: RouterSpec defines the desired state of Router
             properties:
-              cidr:
-                type: string
-              dhcp:
-                properties:
-                  enable:
-                    type: boolean
-                  serverIP:
-                    type: string
-                type: object
-              network:
-                type: string
-              routerIP:
-                type: string
+              subnets:
+                items:
+                  properties:
+                    gateway:
+                      type: string
+                    ip:
+                      type: string
+                    ipMode:
+                      description: 'mode: "", "static", "dhcp"'
+                      type: string
+                    name:
+                      type: string
+                  type: object
+                type: array
             type: object
           status:
-            description: SubnetStatus defines the observed state of Subnet
+            description: RouterStatus defines the observed state of Router
             type: object
         type: object
     served: true

@@ -6,4 +6,5 @@ resources:
 - kvnet_v1alpha1_uplink.yaml
 - k8s.cni.cncf.io_v1_networkattachmentdefinition.yaml
 - kvnet_v1alpha1_subnet.yaml
+- kvnet_v1alpha1_router.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

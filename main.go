@@ -142,6 +142,13 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Subnet")
 			os.Exit(1)
 		}
+		if err = (&controllers.RouterReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Router")
+			os.Exit(1)
+		}
 
 		// Webhook
 		if err = (&kvnetv1alpha1.BridgeConfig{}).SetupWebhookWithManager(mgr); err != nil {
@@ -162,6 +169,14 @@ func main() {
 		}
 
 		// unsorted
+		if err = (&kvnetv1alpha1.Router{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Router")
+			os.Exit(1)
+		}
+		if err = (&kvnetv1alpha1.Subnet{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Subnet")
+			os.Exit(1)
+		}
 		//+kubebuilder:scaffold:builder
 	}
 

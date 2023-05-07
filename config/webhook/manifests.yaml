@@ -51,6 +51,46 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /mutate-kvnet-kojuro-date-v1alpha1-router
+  failurePolicy: Fail
+  name: mrouter.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - routers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /mutate-kvnet-kojuro-date-v1alpha1-subnet
+  failurePolicy: Fail
+  name: msubnet.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - subnets
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /mutate-kvnet-kojuro-date-v1alpha1-uplink
   failurePolicy: Fail
   name: muplink.kb.io
@@ -131,6 +171,46 @@ webhooks:
     - UPDATE
     resources:
     - bridgeconfigs
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-kvnet-kojuro-date-v1alpha1-router
+  failurePolicy: Fail
+  name: vrouter.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - routers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-kvnet-kojuro-date-v1alpha1-subnet
+  failurePolicy: Fail
+  name: vsubnet.kb.io
+  rules:
+  - apiGroups:
+    - kvnet.kojuro.date
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - subnets
   sideEffects: None
 - admissionReviewVersions:
   - v1
