@@ -167,12 +167,22 @@ func (r *BridgeReconciler) findBridgeNetDev(ctx context.Context, bridge *kvnetv1
 }
 
 func (r *BridgeReconciler) addBridgeNetDev(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	if err := r.findBridgeNetDev(ctx, bridge, bridgeName); err == nil {
+		logrus.Infof("bridge %s is existing. skip", bridgeName)
+		return nil
+	}
+
 	cmd := exec.Command("ip", "link", "add", bridgeName, "type", "bridge")
 	cmd.Env = os.Environ()
 	return cmd.Run()
 }
 
 func (r *BridgeReconciler) delBridgeNetDev(ctx context.Context, bridge *kvnetv1alpha1.Bridge, bridgeName string) error {
+	if err := r.findBridgeNetDev(ctx, bridge, bridgeName); err != nil {
+		logrus.Infof("bridge %s is not found. skip", bridgeName)
+		return nil
+	}
+
 	cmd := exec.Command("ip", "link", "del", bridgeName)
 	cmd.Env = os.Environ()
 	return cmd.Run()

@@ -141,4 +141,5 @@ func (r *SubnetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kvnetv1alpha1.Subnet{}).
 		Complete(r)
+	// TODO watch net-attach-def change
 }

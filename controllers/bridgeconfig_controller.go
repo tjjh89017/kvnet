@@ -198,11 +198,16 @@ func (r *BridgeConfigReconciler) addBridge(ctx context.Context, nodeName string,
 func (r *BridgeConfigReconciler) delBridge(ctx context.Context, nodeName string, bridgeConfig *kvnetv1alpha1.BridgeConfig) error {
 	bridges, err := r.findBridge(ctx, nodeName, bridgeConfig)
 	if err != nil {
-		return err
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		return nil
 	}
 	for _, bridge := range bridges.Items {
 		if err := r.Delete(ctx, &bridge); err != nil {
-			return err
+			if !errors.IsNotFound(err) {
+				return err
+			}
 		}
 	}
 	return nil

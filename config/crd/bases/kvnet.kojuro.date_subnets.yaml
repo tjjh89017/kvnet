@@ -35,8 +35,6 @@ spec:
           spec:
             description: SubnetSpec defines the desired state of Subnet
             properties:
-              cidr:
-                type: string
               dhcp:
                 properties:
                   enable:
@@ -45,6 +43,8 @@ spec:
                     type: string
                 type: object
               network:
+                type: string
+              networkCIDR:
                 type: string
               routerIP:
                 type: string

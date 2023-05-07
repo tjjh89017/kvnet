@@ -10,6 +10,22 @@ metadata:
   name: subnet-br0-conf
 spec:
   network: br0-conf
-  cidr: 192.168.0.0/24
+  networkCIDR: 192.168.0.0/24
   routerIP: 192.168.0.1
-  # TODO(user): Add fields here
+
+---
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: Subnet
+metadata:
+  labels:
+    app.kubernetes.io/name: subnet
+    app.kubernetes.io/instance: subnet-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: subnet-br1-conf
+spec:
+  network: br1-conf
+  networkCIDR: 192.168.1.0/24
+  routerIP: 192.168.1.1
+

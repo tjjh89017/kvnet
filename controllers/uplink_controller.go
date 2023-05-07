@@ -194,12 +194,21 @@ func (r *UplinkReconciler) findUplinkNetDev(ctx context.Context, uplink *kvnetv1
 }
 
 func (r *UplinkReconciler) addUplinkNetDev(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	if err := r.findUplinkNetDev(ctx, uplink, uplinkName); err == nil {
+		logrus.Infof("uplink %s is existing. skip", uplinkName)
+		return nil
+	}
 	cmd := exec.Command("ip", "link", "add", uplinkName, "type", "bond")
 	cmd.Env = os.Environ()
 	return cmd.Run()
 }
 
 func (r *UplinkReconciler) delUplinkNetDev(ctx context.Context, uplink *kvnetv1alpha1.Uplink, uplinkName string) error {
+	if err := r.findUplinkNetDev(ctx, uplink, uplinkName); err != nil {
+		logrus.Infof("uplink %s is not found. skip", uplinkName)
+		return nil
+	}
+
 	cmd := exec.Command("ip", "link", "del", uplinkName)
 	cmd.Env = os.Environ()
 	return cmd.Run()

@@ -5,7 +5,7 @@ metadata:
   labels:
     app: sampledeployment
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: sampledeployment
@@ -26,4 +26,39 @@ spec:
       containers:
       - name: samplepod
         command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
-        image: alpine
+        image: tjjh89017/alpine-nettools:latest
+        securityContext:
+          privileged: true
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sampledeployment2
+  labels:
+    app: sampledeployment2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sampledeployment2
+  template:
+    metadata:
+      labels:
+        app: sampledeployment2
+      annotations:
+        k8s.v1.cni.cncf.io/networks: br1-conf
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: bridge.kvnet.kojuro.date/br1
+                operator: Exists
+      containers:
+      - name: samplepod
+        command: ["/bin/ash", "-c", "trap : TERM INT; sleep infinity & wait"]
+        image: tjjh89017/alpine-nettools:latest
+        securityContext:
+          privileged: true

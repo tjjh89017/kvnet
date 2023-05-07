@@ -31,9 +31,9 @@ type SubnetSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Network  string `json:"network,omitempty"`
-	CIDR     string `json:"cidr,omitempty"`
-	RouterIP string `json:"routerIP,omitempty"`
+	Network     string `json:"network,omitempty"`
+	NetworkCIDR string `json:"networkCIDR,omitempty"`
+	RouterIP    string `json:"routerIP,omitempty"`
 
 	DHCP *DhcpOption `json:"dhcp,omitempty"`
 }

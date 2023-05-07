@@ -11,4 +11,4 @@ metadata:
 spec:
   subnets:
     - name: subnet-br0-conf
-  # TODO(user): Add fields here
+    - name: subnet-br1-conf

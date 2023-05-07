@@ -18,9 +18,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/sirupsen/logrus"
+	"net"
+	"reflect"
+	"strings"
 
-	_ "k8s.io/api/core/v1"
+	appv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -31,6 +36,28 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
+)
+
+const (
+	InitContainerCommand = `
+		ip link add mgmt type vrf table 10
+		ip link set mgmt up
+		ip route add table 10 unreachable default metric 4278198272
+		ip route > route.txt
+		ip link set eth0 master mgmt
+		cat route.txt | xargs -t -I {} sh -c "ip route add table 10 {}"
+	`
+	WatchConfigMapCommand = `
+		sh "$(readlink -f "/config/ip-setup.sh")"
+		while true
+		do
+		    REAL=$(readlink -f "/config/ip-setup.sh")
+			echo "wait for change"
+			inotifywait -e delete_self "${REAL}"
+			echo "configMap change"
+			sh "${REAL}"
+		done
+	`
 )
 
 // RouterReconciler reconciles a Router object
@@ -45,6 +72,9 @@ type RouterReconciler struct {
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=subnets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=subnets/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=kvnet.kojuro.date,resources=subnets/finalizers,verbs=update
+//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=apps,resources=deployments/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=apps,resources=deployments/finalizers,verbs=update
 //+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -107,9 +137,16 @@ func (r *RouterReconciler) OnChange(ctx context.Context, router *kvnetv1alpha1.R
 
 	// cretae or update configMap
 	// TODO custom route for FRR
-	_ = subnets
+	if err := r.updateConfigMap(ctx, router, subnets); err != nil {
+		logrus.Errorf("create or update configmap fail %v", err)
+		return ctrl.Result{}, err
+	}
 
 	// create or update deployment
+	if err := r.updateDeployment(ctx, router, subnets); err != nil {
+		logrus.Errorf("create or update deployment fail %v", err)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -126,7 +163,224 @@ func (r *RouterReconciler) OnRemove(ctx context.Context, router *kvnetv1alpha1.R
 	return ctrl.Result{}, nil
 }
 
+func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1alpha1.Router, subnets *kvnetv1alpha1.SubnetList) error {
+	needCreate := false
+	deployment := &appv1.Deployment{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, deployment); err != nil {
+		if !errors.IsNotFound(err) {
+			logrus.Errorf("get deployment failed %v", err)
+			return err
+		}
+		needCreate = true
+		replicas := int32(1)
+		privileged := true
+		deployment = &appv1.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: router.Namespace,
+				Name:      router.Name,
+				Labels: map[string]string{
+					"app": router.Name,
+				},
+			},
+			Spec: appv1.DeploymentSpec{
+				Replicas: &replicas,
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"app": router.Name,
+					},
+				},
+				Template: corev1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Labels: map[string]string{
+							"app": router.Name,
+						},
+					},
+					Spec: corev1.PodSpec{
+						InitContainers: []corev1.Container{
+							{
+								Name:  "init-container",
+								Image: "tjjh89017/alpine-nettools",
+								Command: []string{
+									"/bin/sh",
+									"-c",
+									InitContainerCommand,
+								},
+								SecurityContext: &corev1.SecurityContext{
+									Privileged: &privileged,
+								},
+							},
+						},
+						Containers: []corev1.Container{
+							{
+								Name:  "config-map-notify",
+								Image: "tjjh89017/alpine-nettools",
+								Command: []string{
+									"/bin/sh",
+									"-c",
+									WatchConfigMapCommand,
+								},
+								SecurityContext: &corev1.SecurityContext{
+									Privileged: &privileged,
+								},
+								VolumeMounts: []corev1.VolumeMount{
+									{
+										Name:      "config",
+										MountPath: "/config",
+									},
+								},
+							},
+						},
+						Volumes: []corev1.Volume{
+							{
+								Name: "config",
+								VolumeSource: corev1.VolumeSource{
+									ConfigMap: &corev1.ConfigMapVolumeSource{
+										LocalObjectReference: corev1.LocalObjectReference{
+											Name: router.Name,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	deploymentCopy := deployment.DeepCopy()
+
+	// replace multus annotation
+	nadList := make([]string, 0)
+	for _, subnet := range subnets.Items {
+		nadList = append(nadList, subnet.Spec.Network)
+	}
+	nadName := strings.Join(nadList[:], ", ")
+	annotations := deploymentCopy.Spec.Template.Annotations
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+	annotations["k8s.v1.cni.cncf.io/networks"] = nadName
+	deploymentCopy.Spec.Template.Annotations = annotations
+	logrus.Infof("deployment template %v", deploymentCopy.Spec.Template)
+
+	// TODO replace affinity
+	matchExpressions := make([]corev1.NodeSelectorRequirement, 0)
+	for _, subnet := range subnets.Items {
+		for k, _ := range subnet.Labels {
+			if strings.HasPrefix(k, kvnetv1alpha1.BridgeNodeLabel) {
+				matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
+					Key:      k,
+					Operator: corev1.NodeSelectorOpExists,
+				})
+			}
+		}
+	}
+
+	deploymentCopy.Spec.Template.Spec.Affinity = &corev1.Affinity{
+		NodeAffinity: &corev1.NodeAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+				NodeSelectorTerms: []corev1.NodeSelectorTerm{
+					{
+						MatchExpressions: matchExpressions,
+					},
+				},
+			},
+		},
+	}
+
+	if needCreate {
+		if err := r.Create(ctx, deploymentCopy); err != nil {
+			logrus.Errorf("error to create router deployment %v", err)
+			return err
+		}
+	} else {
+		if !reflect.DeepEqual(deployment, deploymentCopy) {
+			if err := r.Update(ctx, deploymentCopy); err != nil {
+				logrus.Errorf("error to update router deployment %v", err)
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1alpha1.Router, subnets *kvnetv1alpha1.SubnetList) error {
+	configMap := &corev1.ConfigMap{}
+	if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, configMap); err != nil {
+		if !errors.IsNotFound(err) {
+			logrus.Errorf("get configMap failed %v", err)
+			return err
+		}
+		configMap.Namespace = router.Namespace
+		configMap.Name = router.Name
+
+		if err := r.Create(ctx, configMap); err != nil {
+			logrus.Errorf("create default configMap fail %v", err)
+			return err
+		}
+
+		// TODO not sure we need this again
+		if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, configMap); err != nil {
+			logrus.Errorf("get configMap failed again %v", err)
+			return err
+		}
+	}
+
+	configMapCopy := configMap.DeepCopy()
+
+	if configMapCopy.Data == nil {
+		configMapCopy.Data = make(map[string]string)
+	}
+
+	// generate interface IP config
+	ipCmd := ""
+	if len(router.Spec.Subnets) != len(subnets.Items) {
+		logrus.Errorf("subnet is not ready. reconcile")
+		return fmt.Errorf("subnet is not ready. reconcile")
+	}
+	for i, subnet := range router.Spec.Subnets {
+		switch subnet.IPMode {
+		case "":
+			// get router ip from kvnetv1alpha1.Subnet
+			routerIP := net.ParseIP(subnets.Items[i].Spec.RouterIP)
+			if routerIP == nil {
+				logrus.Errorf("parse routerIP from subnet CR fail")
+				return fmt.Errorf("parse routerIP from subnet CR fail")
+			}
+			_, ipv4Net, err := net.ParseCIDR(subnets.Items[i].Spec.NetworkCIDR)
+			if err != nil {
+				logrus.Errorf("parse networkCIDR from subnet CR fail %v", err)
+				return err
+			}
+
+			ipv4Net.IP = routerIP
+
+			ipCmd = ipCmd + fmt.Sprintf("ip addr flush dev net%d\n", i+1)
+			ipCmd = ipCmd + fmt.Sprintf("ip addr add %s dev net%d\n", ipv4Net.String(), i+1)
+
+		case "static":
+			// TODO implement
+		case "dhcp":
+			// TODO implement
+		}
+
+	}
+
+	logrus.Infof("ipCmd: %s", ipCmd)
+
+	configMapCopy.Data["ip-setup.sh"] = ipCmd
+
+	// TODO FRR static route
+
+	if !reflect.DeepEqual(configMap, configMapCopy) {
+		if err := r.Update(ctx, configMapCopy); err != nil {
+			logrus.Errorf("update configMap failed %v", err)
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -212,4 +466,5 @@ func (r *RouterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kvnetv1alpha1.Router{}).
 		Complete(r)
+	// TODO watch subnet change
 }
