@@ -24,6 +24,16 @@ change node labels and BridgeConfig/UplinkConfig/Deployment selectors to test
     - add MyDeployment to deployment (use MyDeployment as 3rd party resource, becuase add k8s core reousrce webhook is nightmare for controller-runtime version before v0.15.0)
 - add WAN attr in Router, only WAN could do NAT
     - Don't setup router label on WAN subnet
+- router controller needs to watch subnet changes to update router itself
+- change router from deployment to statefulset
+- better way to set static ip
+    - put annotation on Kubevirt VM with static IP and Mac
+    - watch kubevirt VM annotations and update DHCP server IP/MAC mapping
+    - get correct dhcp and subnet from kubevirt VM network spec
+- better way to set static floating ip
+    - put annotaton on kubevirt vm with static IP and mac and FIP
+    - watch kubevirt VM annotations and update router iptable NAT rule with FIP and IP
+    - get correct router from kubevirt vm network spec and put NAT rule on that router wan port
 
 ## trouble shoot
 
