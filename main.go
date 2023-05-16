@@ -112,6 +112,13 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Uplink")
 			os.Exit(1)
 		}
+		if err = (&controllers.VxlanReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "Vxlan")
+			os.Exit(1)
+		}
 	} else {
 		// Reconciler
 		if err = (&controllers.BridgeConfigReconciler{
@@ -149,6 +156,13 @@ func main() {
 			setupLog.Error(err, "unable to create controller", "controller", "Router")
 			os.Exit(1)
 		}
+		if err = (&controllers.VxlanConfigReconciler{
+			Client: mgr.GetClient(),
+			Scheme: mgr.GetScheme(),
+		}).SetupWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create controller", "controller", "VxlanConfig")
+			os.Exit(1)
+		}
 
 		// Webhook
 		if err = (&kvnetv1alpha1.BridgeConfig{}).SetupWebhookWithManager(mgr); err != nil {
@@ -167,14 +181,22 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Uplink")
 			os.Exit(1)
 		}
-
-		// unsorted
 		if err = (&kvnetv1alpha1.Router{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Router")
 			os.Exit(1)
 		}
 		if err = (&kvnetv1alpha1.Subnet{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Subnet")
+			os.Exit(1)
+		}
+
+		// unsorted
+		if err = (&kvnetv1alpha1.Vxlan{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Vxlan")
+			os.Exit(1)
+		}
+		if err = (&kvnetv1alpha1.VxlanConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "VxlanConfig")
 			os.Exit(1)
 		}
 		//+kubebuilder:scaffold:builder

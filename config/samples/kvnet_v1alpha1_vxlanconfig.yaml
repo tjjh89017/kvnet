@@ -1,0 +1,33 @@
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: VxlanConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: vxlanconfig
+    app.kubernetes.io/instance: vxlanconfig-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: vxlanconfig-sample
+spec:
+  selector: {}
+  vxlanID: 100
+  template:
+    spec:
+      master: br0
+
+---
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: VxlanConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: vxlanconfig
+    app.kubernetes.io/instance: vxlanconfig-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: vxlanconfig-sample2
+spec:
+  selector: {}
+  vxlanID: 200
+  template:
+    spec: {}

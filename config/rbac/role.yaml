@@ -251,3 +251,55 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - vxlanconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - vxlanconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - vxlanconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - vxlans
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - vxlans/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kvnet.kojuro.date
+  resources:
+  - vxlans/status
+  verbs:
+  - get
+  - patch
+  - update

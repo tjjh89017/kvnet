@@ -1,0 +1,12 @@
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: Vxlan
+metadata:
+  labels:
+    app.kubernetes.io/name: vxlan
+    app.kubernetes.io/instance: vxlan-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: vxlan-sample
+spec:
+  # TODO(user): Add fields here

@@ -93,4 +93,29 @@ resources:
     defaulting: true
     validation: true
     webhookVersion: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: kojuro.date
+  group: kvnet
+  kind: Vxlan
+  path: github.com/tjjh89017/kvnet/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kojuro.date
+  group: kvnet
+  kind: VxlanConfig
+  path: github.com/tjjh89017/kvnet/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 version: "3"
