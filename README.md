@@ -22,6 +22,8 @@ change node labels and BridgeConfig/UplinkConfig/Deployment selectors to test
     - add webhook to insert affinity
     - test webhook will add network label expression to all affinity
     - add MyDeployment to deployment (use MyDeployment as 3rd party resource, becuase add k8s core reousrce webhook is nightmare for controller-runtime version before v0.15.0)
+- add WAN attr in Router, only WAN could do NAT
+    - Don't setup router label on WAN subnet
 
 ## trouble shoot
 
