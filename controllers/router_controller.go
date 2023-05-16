@@ -51,7 +51,7 @@ const (
 		sh "$(readlink -f "/config/ip-setup.sh")"
 		while true
 		do
-		    REAL=$(readlink -f "/config/ip-setup.sh")
+			REAL=$(readlink -f "/config/ip-setup.sh")
 			echo "wait for change"
 			inotifywait -e delete_self "${REAL}"
 			echo "configMap change"

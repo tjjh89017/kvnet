@@ -44,6 +44,8 @@ type SubnetOption struct {
 	IPMode  string `json:"ipMode,omitempty"`
 	IP      string `json:"ip,omitempty"`
 	Gateway string `json:"gateway,omitempty"`
+
+	Masq bool `json:"masq,omitempty"`
 }
 
 // RouterStatus defines the observed state of Router
