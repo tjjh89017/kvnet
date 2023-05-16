@@ -202,7 +202,7 @@ func (r *RouterReconciler) OnRemove(ctx context.Context, router *kvnetv1alpha1.R
 	return ctrl.Result{}, nil
 }
 
-func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1alpha1.Router, subnets *kvnetv1alpha1.SubnetList) error {
+func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1alpha1.Router, subnets []*kvnetv1alpha1.Subnet) error {
 	needCreate := false
 	deployment := &appv1.Deployment{}
 	if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, deployment); err != nil {
@@ -297,7 +297,7 @@ func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1
 
 	// replace multus annotation
 	nadList := make([]string, 0)
-	for _, subnet := range subnets.Items {
+	for _, subnet := range subnets {
 		nadList = append(nadList, subnet.Spec.Network)
 	}
 	nadName := strings.Join(nadList[:], ", ")
@@ -311,7 +311,7 @@ func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1
 
 	// TODO replace affinity
 	matchExpressions := make([]corev1.NodeSelectorRequirement, 0)
-	for _, subnet := range subnets.Items {
+	for _, subnet := range subnets {
 		for k, _ := range subnet.Labels {
 			if strings.HasPrefix(k, kvnetv1alpha1.BridgeNodeLabel) {
 				matchExpressions = append(matchExpressions, corev1.NodeSelectorRequirement{
@@ -351,7 +351,7 @@ func (r *RouterReconciler) updateDeployment(ctx context.Context, router *kvnetv1
 	return nil
 }
 
-func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1alpha1.Router, subnets *kvnetv1alpha1.SubnetList) error {
+func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1alpha1.Router, subnets []*kvnetv1alpha1.Subnet) error {
 	configMap := &corev1.ConfigMap{}
 	if err := r.Get(ctx, types.NamespacedName{Namespace: router.Namespace, Name: router.Name}, configMap); err != nil {
 		if !errors.IsNotFound(err) {
@@ -387,9 +387,10 @@ func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1a
 		configMapCopy.Data = make(map[string]string)
 	}
 
+	logrus.Infof("configmap subnets %v", subnets)
 	// generate interface IP config
 	ipCmd := ""
-	if len(router.Spec.Subnets) != len(subnets.Items) {
+	if len(router.Spec.Subnets) != len(subnets) {
 		logrus.Errorf("subnet is not ready. reconcile")
 		return fmt.Errorf("subnet is not ready. reconcile")
 	}
@@ -397,12 +398,12 @@ func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1a
 		switch subnet.IPMode {
 		case "":
 			// get router ip from kvnetv1alpha1.Subnet
-			routerIP := net.ParseIP(subnets.Items[i].Spec.RouterIP)
+			routerIP := net.ParseIP(subnets[i].Spec.RouterIP)
 			if routerIP == nil {
 				logrus.Errorf("parse routerIP from subnet CR fail")
 				return fmt.Errorf("parse routerIP from subnet CR fail")
 			}
-			_, ipv4Net, err := net.ParseCIDR(subnets.Items[i].Spec.NetworkCIDR)
+			_, ipv4Net, err := net.ParseCIDR(subnets[i].Spec.NetworkCIDR)
 			if err != nil {
 				logrus.Errorf("parse networkCIDR from subnet CR fail %v", err)
 				return err
@@ -437,7 +438,7 @@ func (r *RouterReconciler) updateConfigMap(ctx context.Context, router *kvnetv1a
 	return nil
 }
 
-func (r *RouterReconciler) getSubnetListWithRouter(ctx context.Context, router *kvnetv1alpha1.Router) (*kvnetv1alpha1.SubnetList, error) {
+func (r *RouterReconciler) getSubnetListWithRouter(ctx context.Context, router *kvnetv1alpha1.Router) ([]*kvnetv1alpha1.Subnet, error) {
 	// get all labels with current router name
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{
@@ -449,10 +450,21 @@ func (r *RouterReconciler) getSubnetListWithRouter(ctx context.Context, router *
 		return nil, err
 	}
 
-	subnets := &kvnetv1alpha1.SubnetList{}
-	if err := r.List(ctx, subnets, client.InNamespace(router.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
+	subnetList := &kvnetv1alpha1.SubnetList{}
+	if err := r.List(ctx, subnetList, client.InNamespace(router.Namespace), client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		logrus.Errorf("get subnets failed %v", err)
 		return nil, err
+	}
+
+	subnets := make([]*kvnetv1alpha1.Subnet, 0)
+	for _, subnetOption := range router.Spec.Subnets {
+		// search
+		for _, subnet := range subnetList.Items {
+			if subnet.Name == subnetOption.Name {
+				subnets = append(subnets, &subnet)
+				break
+			}
+		}
 	}
 
 	return subnets, nil
@@ -469,7 +481,7 @@ func (r *RouterReconciler) updateSubnetLabel(ctx context.Context, router *kvnetv
 		// set 1 to mark we should create but we still not
 		subnetMap[subnet.Name] = 1
 	}
-	for _, subnet := range subnets.Items {
+	for _, subnet := range subnets {
 		// already have this subnet
 		subnetMap[subnet.Name] |= 2
 	}
@@ -523,4 +535,5 @@ func (r *RouterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kvnetv1alpha1.Router{}).
 		Complete(r)
 	// TODO watch subnet change
+	// TODO watch deployment to redeploy
 }

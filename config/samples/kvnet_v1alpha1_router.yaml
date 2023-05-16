@@ -12,3 +12,4 @@ spec:
   subnets:
     - name: subnet-br0-conf
     - name: subnet-br1-conf
+    - name: subnet-br2-conf

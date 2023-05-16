@@ -33,3 +33,21 @@ spec:
     spec:
       vlanFiltering: true
 
+---
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: BridgeConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: bridgeconfig
+    app.kubernetes.io/instance: bridgeconfig-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: bridgeconfig-sample3
+spec:
+  selector: {}
+  bridge: br2
+  template:
+    spec:
+      vlanFiltering: true
+

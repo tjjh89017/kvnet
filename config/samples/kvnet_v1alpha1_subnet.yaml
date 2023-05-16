@@ -29,3 +29,19 @@ spec:
   networkCIDR: 192.168.1.0/24
   routerIP: 192.168.1.1
 
+---
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: Subnet
+metadata:
+  labels:
+    app.kubernetes.io/name: subnet
+    app.kubernetes.io/instance: subnet-sample
+    app.kubernetes.io/part-of: kvnet
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: kvnet
+  name: subnet-br2-conf
+spec:
+  network: br2-conf
+  networkCIDR: 192.168.2.0/24
+  routerIP: 192.168.2.1
+

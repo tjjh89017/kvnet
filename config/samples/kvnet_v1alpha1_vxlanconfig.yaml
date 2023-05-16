@@ -13,7 +13,7 @@ spec:
   vxlanID: 100
   template:
     spec:
-      master: br0
+      master: br1
 
 ---
 apiVersion: kvnet.kojuro.date/v1alpha1
@@ -30,4 +30,5 @@ spec:
   selector: {}
   vxlanID: 200
   template:
-    spec: {}
+    spec:
+      master: br2
