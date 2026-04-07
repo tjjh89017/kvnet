@@ -104,7 +104,16 @@ To test with a custom image:
 IMG=myregistry/kvnet:test scripts/setup.sh
 ```
 
-The agent DaemonSet (`scripts/agent-daemonset.yaml`) runs privileged with `hostNetwork: true` so it can configure network interfaces on the host. This is separate from the manager Deployment and is required for Bridge/VXLAN/Uplink CRs to be reconciled on nodes.
+### Sample resources
+
+`scripts/apply-samples.sh` applies the YAMLs in `scripts/samples/` and verifies that the manager creates the expected per-node CRs:
+
+| File | Resource | What it creates |
+|---|---|---|
+| `scripts/samples/bridgetemplate.yaml` | BridgeTemplate `br0` | `{node}.br0` Bridge CR on each worker |
+| `scripts/samples/vxlantemplate.yaml` | VXLANTemplate `vxlan0` | `{node}.vxlan0` VXLAN CR on each worker, attached to `br0`, external mode |
+
+Both templates select nodes with `kvnet.kojuro.date/role=worker`. The agent then reconciles the per-node CRs to configure actual Linux bridge and VXLAN interfaces on each node.
 
 ## Building
 
