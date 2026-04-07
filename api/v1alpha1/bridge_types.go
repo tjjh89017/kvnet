@@ -26,10 +26,6 @@ type BridgeSpec struct {
 	// +optional
 	VlanFiltering bool `json:"vlanFiltering,omitempty"`
 
-	// VniFilter enables per-VLAN VNI filtering on the bridge (for single VXLAN device mode).
-	// +optional
-	VniFilter bool `json:"vniFilter,omitempty"`
-
 	// NfCallIptables enables or disables nf_call_iptables on the bridge.
 	// +kubebuilder:default=false
 	// +optional

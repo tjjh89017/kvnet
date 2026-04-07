@@ -48,10 +48,6 @@ spec:
                 description: VlanFiltering enables or disables VLAN filtering on the
                   bridge.
                 type: boolean
-              vniFilter:
-                description: VniFilter enables per-VLAN VNI filtering on the bridge
-                  (for single VXLAN device mode).
-                type: boolean
             type: object
           status:
             description: BridgeStatus defines the observed state of Bridge.

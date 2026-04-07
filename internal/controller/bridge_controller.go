@@ -101,16 +101,6 @@ func (r *BridgeReconciler) onChange(ctx context.Context, _ ctrl.Request, bridge 
 		return ctrl.Result{}, err
 	}
 
-	// Set vni_filter
-	vniFilter := "0"
-	if bridge.Spec.VniFilter {
-		vniFilter = "1"
-	}
-	if err := execCmd("ip", "link", "set", bridgeName, "type", "bridge", "vni_filter", vniFilter); err != nil {
-		r.setReadyCondition(ctx, bridge, metav1.ConditionFalse, "ConfigFailed", err.Error())
-		return ctrl.Result{}, err
-	}
-
 	// Set nf_call_iptables
 	nfCallIptables := "0"
 	if bridge.Spec.NfCallIptables {
