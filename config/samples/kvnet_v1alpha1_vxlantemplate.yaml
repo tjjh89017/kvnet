@@ -1,9 +1,18 @@
 apiVersion: kvnet.kojuro.date/v1alpha1
 kind: VXLANTemplate
 metadata:
-  labels:
-    app.kubernetes.io/name: kvnet
-    app.kubernetes.io/managed-by: kustomize
-  name: vxlantemplate-sample
+  name: vxlan0
 spec:
-  # TODO(user): Add fields here
+  vxlanName: vxlan0
+  vxlanID: 100
+  nodeSelector:
+    matchLabels:
+      kvnet.kojuro.date/role: worker
+  template:
+    spec:
+      master: br0
+      dev: eth0
+      external: true
+      vniFilter: true
+      learning: false
+      bridgeLearning: false
