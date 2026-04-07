@@ -1,42 +1,137 @@
 # kvnet
-Kubernetes virtual network
 
+A Kubernetes operator for declarative virtual network management. It uses a **manager/agent** architecture: the manager runs centrally and reconciles template resources into per-node CRs, while the agent runs as a DaemonSet on each node and applies network configuration using `iproute2`.
 
-## use KIND to test
+## Architecture
 
-- kind create cluster --config a.yaml (4 node)
-- install cert-manager
-    - kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
-- make docker-build deploy IMG="tjjh89017/kvnet:v0.0.1"
-- kubectl apply -f config/samples/kvnet_v1alpha1_bridgeconfig.yaml
-- kubectl apply -f config/samples/kvnet_v1alpha1_uplinkconfig.yaml
-- kubectl apply -f config/samples/k8s.cni.cncf.io_v1_networkattachmentdefinition.yaml
-- kubectl apply -f config/samples/deployment_alpine.yaml
+```
+Manager (Deployment)           Agent (DaemonSet, one per node)
+  BridgeTemplate       →         Bridge
+  VXLANTemplate        →         VXLAN
+  UplinkTemplate       →         Uplink
+```
 
-change node labels and BridgeConfig/UplinkConfig/Deployment selectors to test
+Templates use a `nodeSelector` to target nodes. The manager creates a CR for each matching node named `{nodeName}.{deviceName}`. The agent on each node reconciles only its own CRs (filtered by `NODENAME`).
 
-## TODO
+## Custom Resources
 
-- fill status for all resource
-- create a new MyDeployment CRD to add affinity test on it
-    - add webhook to insert affinity
-    - test webhook will add network label expression to all affinity
-    - add MyDeployment to deployment (use MyDeployment as 3rd party resource, becuase add k8s core reousrce webhook is nightmare for controller-runtime version before v0.15.0)
-- add WAN attr in Router, only WAN could do NAT
-    - Don't setup router label on WAN subnet
-- router controller needs to watch subnet changes to update router itself
-- change router from deployment to statefulset
-- better way to set static ip
-    - put annotation on Kubevirt VM with static IP and Mac
-    - watch kubevirt VM annotations and update DHCP server IP/MAC mapping
-    - get correct dhcp and subnet from kubevirt VM network spec
-- better way to set static floating ip
-    - put annotaton on kubevirt vm with static IP and mac and FIP
-    - watch kubevirt VM annotations and update router iptable NAT rule with FIP and IP
-    - get correct router from kubevirt vm network spec and put NAT rule on that router wan port
+### Bridge / BridgeTemplate
 
-## trouble shoot
+Manages a Linux bridge device on a node.
+
+| Field | Type | Description |
+|---|---|---|
+| `vlanFiltering` | bool | Enable VLAN filtering on the bridge |
+| `nfCallIptables` | bool | Enable `nf_call_iptables` (default: false) |
+
+### VXLAN / VXLANTemplate
+
+Manages a VXLAN tunnel interface attached to a bridge.
+
+| Field | Type | Description |
+|---|---|---|
+| `vni` | int | VXLAN Network Identifier (traditional mode only) |
+| `master` | string | Bridge device to attach to |
+| `localIP` | string | Source IP for encapsulation (auto-detected from `dev` if empty) |
+| `dev` | string | Interface to detect local IP from |
+| `mtu` | int | MTU for the VXLAN interface (0 = system default) |
+| `learning` | bool | Enable dynamic VTEP learning (disable for EVPN) |
+| `bridgeLearning` | bool | Enable bridge-port MAC learning (disable for EVPN) |
+| `external` | bool | Single VXLAN device mode (`collect_metadata`); `vni` is ignored |
+| `vniFilter` | bool | Enable per-VNI filtering (requires `external: true`) |
+| `portVLANConfig` | object | Bridge port VLAN settings (see below) |
+
+### Uplink / UplinkTemplate
+
+Manages a bond interface and attaches it to a bridge.
+
+| Field | Type | Description |
+|---|---|---|
+| `master` | string | Bridge device to attach to |
+| `bondMode` | string | Bonding mode (`balance-rr`, `active-backup`, `802.3ad`, etc.) |
+| `bondSlaves` | []string | Slave interfaces for the bond |
+| `portVLANConfig` | object | Bridge port VLAN settings (see below) |
+
+### PortVLANConfig
+
+Shared type used by VXLAN and Uplink for bridge port VLAN configuration.
+
+| Field | Type | Description |
+|---|---|---|
+| `pvid` | int | Native/untagged VLAN ID |
+| `vids` | []int | Trunk VLAN IDs allowed on this port |
+| `tunnelInfo` | []VLANTunnelMapping | VLAN-to-VNI mappings for single VXLAN device mode |
+
+`VLANTunnelMapping` maps a VLAN ID (or range) to a VNI:
+
+```yaml
+tunnelInfo:
+  - vid: 100
+    vni: 1000
+  - vid: 200
+    vidEnd: 299   # maps VLANs 200-299 to VNIs 2000-2099
+    vni: 2000
+```
+
+## VXLAN Modes
+
+**Traditional mode** (`external: false`): one VXLAN device per VNI. Set `vni` in the template.
+
+**External mode** (`external: true`): a single VXLAN device with `collect_metadata`. VNI is determined by the bridge VLAN tunnel mapping in `portVLANConfig.tunnelInfo`. Enable `vniFilter: true` to restrict which VNIs are accepted.
+
+## Testing with KIND
+
+```sh
+# 1. Create a 4-node cluster
+kind create cluster --config hack/kind.yaml
+
+# 2. Install cert-manager (required for webhooks)
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+
+# 3. Build and deploy
+make docker-build deploy IMG="tjjh89017/kvnet:v0.0.1"
+
+# 4. Apply sample resources
+kubectl apply -f config/samples/kvnet_v1alpha1_bridgetemplate.yaml
+kubectl apply -f config/samples/kvnet_v1alpha1_vxlantemplate.yaml
+kubectl apply -f config/samples/kvnet_v1alpha1_uplinktemplate.yaml
+```
+
+Change node labels and template `nodeSelector` fields to control which nodes receive which network configuration.
+
+## Building
+
+```sh
+make docker-build IMG=<image>:<tag>
+make deploy IMG=<image>:<tag>
+```
+
+The operator runs as a single binary (`/manager`) with mode controlled by flags:
+
+- `--agent`: Run in agent mode. Requires `NODENAME` environment variable.
+- `--leader-elect`: Enable leader election (manager mode).
+
+## Labels
+
+Resources use the following labels:
+
+| Label | Description |
+|---|---|
+| `kvnet.kojuro.date/template-name` | Name of the template that created this CR |
+| `kvnet.kojuro.date/template-namespace` | Namespace of the template |
+| `kvnet.kojuro.date/node` | Node this CR is scoped to |
+
+## Troubleshooting
 
 ### Too many open files
 
-https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
+See: https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files
+
+## TODO
+
+- Fill status conditions for all resources
+- WAN attribute on Router (only WAN ports do NAT)
+- Router controller watches Subnet changes
+- Change Router from Deployment to StatefulSet
+- Static IP assignment via KubeVirt VM annotations
+- Floating IP management via KubeVirt VM annotations
