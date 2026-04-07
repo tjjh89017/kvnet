@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package helper
 
 import (
 	"fmt"
@@ -26,8 +26,8 @@ import (
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
 )
 
-// parseDeviceName strips the node-name prefix from a CR name to get the device name.
-func parseDeviceName(crName, nodeName string) (string, error) {
+// ParseDeviceName strips the node-name prefix from a CR name to get the device name.
+func ParseDeviceName(crName, nodeName string) (string, error) {
 	prefix := nodeName + "."
 	if !strings.HasPrefix(crName, prefix) {
 		return "", fmt.Errorf("CR name %q does not match node %q", crName, nodeName)
@@ -35,8 +35,8 @@ func parseDeviceName(crName, nodeName string) (string, error) {
 	return strings.TrimPrefix(crName, prefix), nil
 }
 
-// execCmd runs a command and returns an error if it fails.
-func execCmd(name string, args ...string) error {
+// ExecCmd runs a command and returns an error if it fails.
+func ExecCmd(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -45,8 +45,8 @@ func execCmd(name string, args ...string) error {
 	return nil
 }
 
-// isBridgeSlave checks if a network device is attached to a bridge as a slave.
-func isBridgeSlave(devName string) bool {
+// IsBridgeSlave checks if a network device is attached to a bridge as a slave.
+func IsBridgeSlave(devName string) bool {
 	cmd := exec.Command("ip", "-d", "link", "show", "dev", devName)
 	output, err := cmd.Output()
 	if err != nil {
@@ -55,8 +55,8 @@ func isBridgeSlave(devName string) bool {
 	return strings.Contains(string(output), "bridge_slave")
 }
 
-// getInterfaceIP returns the first IPv4 address of a network interface.
-func getInterfaceIP(devName string) (string, error) {
+// GetInterfaceIP returns the first IPv4 address of a network interface.
+func GetInterfaceIP(devName string) (string, error) {
 	iface, err := net.InterfaceByName(devName)
 	if err != nil {
 		return "", fmt.Errorf("interface %q not found: %w", devName, err)
@@ -73,16 +73,16 @@ func getInterfaceIP(devName string) (string, error) {
 	return "", fmt.Errorf("no IPv4 address found on %q", devName)
 }
 
-// applyPortVLANConfig configures bridge port VLAN settings for a device.
-func applyPortVLANConfig(devName string, cfg *kvnetv1alpha1.PortVLANConfig) error {
+// ApplyPortVLANConfig configures bridge port VLAN settings for a device.
+func ApplyPortVLANConfig(devName string, cfg *kvnetv1alpha1.PortVLANConfig) error {
 	if cfg.Pvid != nil {
-		if err := execCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(*cfg.Pvid), "pvid", "untagged"); err != nil {
+		if err := ExecCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(*cfg.Pvid), "pvid", "untagged"); err != nil {
 			return fmt.Errorf("set pvid %d on %s: %w", *cfg.Pvid, devName, err)
 		}
 	}
 
 	for _, vid := range cfg.Vids {
-		if err := execCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(vid)); err != nil {
+		if err := ExecCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(vid)); err != nil {
 			return fmt.Errorf("add vid %d on %s: %w", vid, devName, err)
 		}
 	}
@@ -95,7 +95,7 @@ func applyPortVLANConfig(devName string, cfg *kvnetv1alpha1.PortVLANConfig) erro
 		for i := 0; i <= vidEnd-mapping.Vid; i++ {
 			vid := mapping.Vid + i
 			vni := mapping.Vni + i
-			if err := execCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(vid), "tunnel_info", "id", strconv.Itoa(vni)); err != nil {
+			if err := ExecCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(vid), "tunnel_info", "id", strconv.Itoa(vni)); err != nil {
 				return fmt.Errorf("add tunnel_info vid=%d vni=%d on %s: %w", vid, vni, devName, err)
 			}
 		}

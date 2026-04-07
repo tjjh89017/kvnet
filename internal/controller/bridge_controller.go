@@ -31,6 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
+	"github.com/tjjh89017/kvnet/internal/helper"
 )
 
 // BridgeReconciler reconciles a Bridge object (agent mode)
@@ -75,15 +76,15 @@ func (r *BridgeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *BridgeReconciler) onChange(ctx context.Context, _ ctrl.Request, bridge *kvnetv1alpha1.Bridge) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	bridgeName, err := parseDeviceName(bridge.Name, r.NodeName)
+	bridgeName, err := helper.ParseDeviceName(bridge.Name, r.NodeName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Check if bridge exists, create if not
-	if err := execCmd("ip", "link", "show", "dev", bridgeName); err != nil {
+	if err := helper.ExecCmd("ip", "link", "show", "dev", bridgeName); err != nil {
 		log.Info("creating bridge", "name", bridgeName)
-		if err := execCmd("ip", "link", "add", bridgeName, "type", "bridge"); err != nil {
+		if err := helper.ExecCmd("ip", "link", "add", bridgeName, "type", "bridge"); err != nil {
 			r.setReadyCondition(ctx, bridge, metav1.ConditionFalse, "CreateFailed", err.Error())
 			return ctrl.Result{}, err
 		}
@@ -94,7 +95,7 @@ func (r *BridgeReconciler) onChange(ctx context.Context, _ ctrl.Request, bridge 
 	if bridge.Spec.VlanFiltering {
 		vlanFiltering = "1"
 	}
-	if err := execCmd("ip", "link", "set", bridgeName, "type", "bridge", "vlan_filtering", vlanFiltering); err != nil {
+	if err := helper.ExecCmd("ip", "link", "set", bridgeName, "type", "bridge", "vlan_filtering", vlanFiltering); err != nil {
 		r.setReadyCondition(ctx, bridge, metav1.ConditionFalse, "ConfigFailed", err.Error())
 		return ctrl.Result{}, err
 	}
@@ -104,13 +105,13 @@ func (r *BridgeReconciler) onChange(ctx context.Context, _ ctrl.Request, bridge 
 	if bridge.Spec.NfCallIptables {
 		nfCallIptables = "1"
 	}
-	if err := execCmd("ip", "link", "set", bridgeName, "type", "bridge", "nf_call_iptables", nfCallIptables); err != nil {
+	if err := helper.ExecCmd("ip", "link", "set", bridgeName, "type", "bridge", "nf_call_iptables", nfCallIptables); err != nil {
 		r.setReadyCondition(ctx, bridge, metav1.ConditionFalse, "ConfigFailed", err.Error())
 		return ctrl.Result{}, err
 	}
 
 	// Bring bridge up
-	if err := execCmd("ip", "link", "set", bridgeName, "up"); err != nil {
+	if err := helper.ExecCmd("ip", "link", "set", bridgeName, "up"); err != nil {
 		r.setReadyCondition(ctx, bridge, metav1.ConditionFalse, "UpFailed", err.Error())
 		return ctrl.Result{}, err
 	}
@@ -128,9 +129,9 @@ func (r *BridgeReconciler) onChange(ctx context.Context, _ ctrl.Request, bridge 
 func (r *BridgeReconciler) onDelete(ctx context.Context, _ ctrl.Request, bridge *kvnetv1alpha1.Bridge) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	bridgeName, err := parseDeviceName(bridge.Name, r.NodeName)
+	bridgeName, err := helper.ParseDeviceName(bridge.Name, r.NodeName)
 	if err == nil {
-		if delErr := execCmd("ip", "link", "del", bridgeName); delErr != nil {
+		if delErr := helper.ExecCmd("ip", "link", "del", bridgeName); delErr != nil {
 			log.Info("bridge already removed or failed to delete", "name", bridgeName, "error", delErr)
 		}
 		if err := r.labelNode(ctx, bridgeName, ""); err != nil {

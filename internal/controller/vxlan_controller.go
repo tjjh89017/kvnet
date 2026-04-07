@@ -32,6 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
+	"github.com/tjjh89017/kvnet/internal/helper"
 )
 
 // VXLANReconciler reconciles a VXLAN object (agent mode)
@@ -79,7 +80,7 @@ func (r *VXLANReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl
 func (r *VXLANReconciler) onChange(ctx context.Context, _ ctrl.Request, vxlan *kvnetv1alpha1.VXLAN) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	vxlanDevName, err := parseDeviceName(vxlan.Name, r.NodeName)
+	vxlanDevName, err := helper.ParseDeviceName(vxlan.Name, r.NodeName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -117,7 +118,7 @@ func (r *VXLANReconciler) onChange(ctx context.Context, _ ctrl.Request, vxlan *k
 }
 
 func (r *VXLANReconciler) ensureVXLANDevice(ctx context.Context, vxlan *kvnetv1alpha1.VXLAN, vxlanDevName string) error {
-	if err := execCmd("ip", "link", "show", "dev", vxlanDevName); err == nil {
+	if err := helper.ExecCmd("ip", "link", "show", "dev", vxlanDevName); err == nil {
 		return nil
 	}
 
@@ -128,7 +129,7 @@ func (r *VXLANReconciler) ensureVXLANDevice(ctx context.Context, vxlan *kvnetv1a
 		if vxlan.Spec.VNIFilter {
 			args = append(args, "vnifilter")
 		}
-		if err := execCmd("ip", args...); err != nil {
+		if err := helper.ExecCmd("ip", args...); err != nil {
 			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())
 			return err
 		}
@@ -144,7 +145,7 @@ func (r *VXLANReconciler) ensureVXLANDevice(ctx context.Context, vxlan *kvnetv1a
 			return err
 		}
 	}
-	if err := execCmd("ip", "link", "add", vxlanDevName, "type", "vxlan", "id", strconv.Itoa(vxlanID), "dstport", "4789"); err != nil {
+	if err := helper.ExecCmd("ip", "link", "add", vxlanDevName, "type", "vxlan", "id", strconv.Itoa(vxlanID), "dstport", "4789"); err != nil {
 		r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())
 		return err
 	}
@@ -155,7 +156,7 @@ func (r *VXLANReconciler) configureVXLANDevice(ctx context.Context, vxlan *kvnet
 	localIP := vxlan.Spec.LocalIP
 	if localIP == "" && vxlan.Spec.Dev != "" {
 		var err error
-		localIP, err = getInterfaceIP(vxlan.Spec.Dev)
+		localIP, err = helper.GetInterfaceIP(vxlan.Spec.Dev)
 		if err != nil {
 			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "LocalIPFailed", err.Error())
 			return "", err
@@ -163,33 +164,33 @@ func (r *VXLANReconciler) configureVXLANDevice(ctx context.Context, vxlan *kvnet
 	}
 
 	if localIP != "" {
-		if err := execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "local", localIP); err != nil {
+		if err := helper.ExecCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "local", localIP); err != nil {
 			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ConfigFailed", err.Error())
 			return "", err
 		}
 	}
 
 	if vxlan.Spec.MTU > 0 {
-		if err := execCmd("ip", "link", "set", vxlanDevName, "mtu", strconv.Itoa(vxlan.Spec.MTU)); err != nil {
+		if err := helper.ExecCmd("ip", "link", "set", vxlanDevName, "mtu", strconv.Itoa(vxlan.Spec.MTU)); err != nil {
 			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "MTUFailed", err.Error())
 			return "", err
 		}
 	}
 
 	if vxlan.Spec.Master != "" {
-		if err := execCmd("ip", "link", "set", vxlanDevName, "master", vxlan.Spec.Master); err != nil {
+		if err := helper.ExecCmd("ip", "link", "set", vxlanDevName, "master", vxlan.Spec.Master); err != nil {
 			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "MasterFailed", err.Error())
 			return "", err
 		}
 	}
 
 	if vxlan.Spec.Learning {
-		_ = execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "learning")
+		_ = helper.ExecCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "learning")
 	} else {
-		_ = execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "nolearning")
+		_ = helper.ExecCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "nolearning")
 	}
 
-	if err := execCmd("ip", "link", "set", vxlanDevName, "up"); err != nil {
+	if err := helper.ExecCmd("ip", "link", "set", vxlanDevName, "up"); err != nil {
 		r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "UpFailed", err.Error())
 		return "", err
 	}
@@ -210,7 +211,7 @@ func applyVNIFilter(ctx context.Context, devName string, tunnelInfo []kvnetv1alp
 		}
 		for i := 0; i <= vidEnd-mapping.Vid; i++ {
 			vni := mapping.Vni + i
-			if err := execCmd("bridge", "vni", "add", "dev", devName, "vni", strconv.Itoa(vni)); err != nil {
+			if err := helper.ExecCmd("bridge", "vni", "add", "dev", devName, "vni", strconv.Itoa(vni)); err != nil {
 				log.Error(err, "failed to add vni", "dev", devName, "vni", vni)
 			}
 		}
@@ -219,7 +220,7 @@ func applyVNIFilter(ctx context.Context, devName string, tunnelInfo []kvnetv1alp
 
 func (r *VXLANReconciler) applyBridgeSlaveSettings(ctx context.Context, vxlan *kvnetv1alpha1.VXLAN, vxlanDevName string) error {
 	log := logf.FromContext(ctx)
-	if !isBridgeSlave(vxlanDevName) {
+	if !helper.IsBridgeSlave(vxlanDevName) {
 		return nil
 	}
 
@@ -227,12 +228,12 @@ func (r *VXLANReconciler) applyBridgeSlaveSettings(ctx context.Context, vxlan *k
 	if vxlan.Spec.BridgeLearning {
 		bridgeLearning = "on"
 	}
-	if err := execCmd("bridge", "link", "set", "dev", vxlanDevName, "learning", bridgeLearning); err != nil {
+	if err := helper.ExecCmd("bridge", "link", "set", "dev", vxlanDevName, "learning", bridgeLearning); err != nil {
 		log.Error(err, "failed to set bridge learning", "dev", vxlanDevName)
 	}
 
 	if vxlan.Spec.PortVLANConfig != nil {
-		if err := applyPortVLANConfig(vxlanDevName, vxlan.Spec.PortVLANConfig); err != nil {
+		if err := helper.ApplyPortVLANConfig(vxlanDevName, vxlan.Spec.PortVLANConfig); err != nil {
 			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "VLANConfigFailed", err.Error())
 			return err
 		}
@@ -264,19 +265,19 @@ func (r *VXLANReconciler) onRemoteChange(ctx context.Context, _ ctrl.Request, vx
 	}
 
 	for i := range localVXLANs.Items {
-		localDev, err := parseDeviceName(localVXLANs.Items[i].Name, r.NodeName)
+		localDev, err := helper.ParseDeviceName(localVXLANs.Items[i].Name, r.NodeName)
 		if err != nil {
 			continue
 		}
 
 		// Check if local device exists
-		if err := execCmd("ip", "link", "show", "dev", localDev); err != nil {
+		if err := helper.ExecCmd("ip", "link", "show", "dev", localDev); err != nil {
 			continue
 		}
 
 		// Update FDB: remove old entry, then append remote IP
-		_ = execCmd("bridge", "fdb", "del", "00:00:00:00:00:00", "dev", localDev, "dst", vxlan.Status.LocalIP)
-		if err := execCmd("bridge", "fdb", "append", "00:00:00:00:00:00", "dev", localDev, "dst", vxlan.Status.LocalIP); err != nil {
+		_ = helper.ExecCmd("bridge", "fdb", "del", "00:00:00:00:00:00", "dev", localDev, "dst", vxlan.Status.LocalIP)
+		if err := helper.ExecCmd("bridge", "fdb", "append", "00:00:00:00:00:00", "dev", localDev, "dst", vxlan.Status.LocalIP); err != nil {
 			log.Error(err, "failed to add FDB entry", "dev", localDev, "dst", vxlan.Status.LocalIP)
 		} else {
 			log.Info("updated FDB", "dev", localDev, "dst", vxlan.Status.LocalIP)
@@ -289,9 +290,9 @@ func (r *VXLANReconciler) onRemoteChange(ctx context.Context, _ ctrl.Request, vx
 func (r *VXLANReconciler) onDelete(ctx context.Context, _ ctrl.Request, vxlan *kvnetv1alpha1.VXLAN) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	vxlanDevName, err := parseDeviceName(vxlan.Name, r.NodeName)
+	vxlanDevName, err := helper.ParseDeviceName(vxlan.Name, r.NodeName)
 	if err == nil {
-		if delErr := execCmd("ip", "link", "del", vxlanDevName); delErr != nil {
+		if delErr := helper.ExecCmd("ip", "link", "del", vxlanDevName); delErr != nil {
 			log.Info("VXLAN already removed or failed to delete", "name", vxlanDevName, "error", delErr)
 		}
 		if err := r.labelNode(ctx, vxlanDevName, ""); err != nil {

@@ -31,6 +31,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	kvnetv1alpha1 "github.com/tjjh89017/kvnet/api/v1alpha1"
+	"github.com/tjjh89017/kvnet/internal/helper"
 )
 
 // UplinkReconciler reconciles a Uplink object (agent mode)
@@ -74,15 +75,15 @@ func (r *UplinkReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *UplinkReconciler) onChange(ctx context.Context, _ ctrl.Request, uplink *kvnetv1alpha1.Uplink) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	bondName, err := parseDeviceName(uplink.Name, r.NodeName)
+	bondName, err := helper.ParseDeviceName(uplink.Name, r.NodeName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Check if bond exists, create if not
-	if err := execCmd("ip", "link", "show", "dev", bondName); err != nil {
+	if err := helper.ExecCmd("ip", "link", "show", "dev", bondName); err != nil {
 		log.Info("creating bond", "name", bondName)
-		if err := execCmd("ip", "link", "add", bondName, "type", "bond"); err != nil {
+		if err := helper.ExecCmd("ip", "link", "add", bondName, "type", "bond"); err != nil {
 			r.setReadyCondition(ctx, uplink, metav1.ConditionFalse, "CreateFailed", err.Error())
 			return ctrl.Result{}, err
 		}
@@ -90,7 +91,7 @@ func (r *UplinkReconciler) onChange(ctx context.Context, _ ctrl.Request, uplink 
 
 	// Set bond mode
 	if uplink.Spec.BondMode != "" {
-		if err := execCmd("ip", "link", "set", bondName, "type", "bond", "miimon", "100", "mode", uplink.Spec.BondMode); err != nil {
+		if err := helper.ExecCmd("ip", "link", "set", bondName, "type", "bond", "miimon", "100", "mode", uplink.Spec.BondMode); err != nil {
 			r.setReadyCondition(ctx, uplink, metav1.ConditionFalse, "ConfigFailed", err.Error())
 			return ctrl.Result{}, err
 		}
@@ -98,29 +99,29 @@ func (r *UplinkReconciler) onChange(ctx context.Context, _ ctrl.Request, uplink 
 
 	// Attach slaves
 	for _, slave := range uplink.Spec.BondSlaves {
-		_ = execCmd("ip", "link", "set", slave, "down")
-		if err := execCmd("ip", "link", "set", slave, "master", bondName); err != nil {
+		_ = helper.ExecCmd("ip", "link", "set", slave, "down")
+		if err := helper.ExecCmd("ip", "link", "set", slave, "master", bondName); err != nil {
 			log.Error(err, "failed to attach slave", "slave", slave, "bond", bondName)
 		}
 	}
 
 	// Set master bridge if specified
 	if uplink.Spec.Master != "" {
-		if err := execCmd("ip", "link", "set", bondName, "master", uplink.Spec.Master); err != nil {
+		if err := helper.ExecCmd("ip", "link", "set", bondName, "master", uplink.Spec.Master); err != nil {
 			r.setReadyCondition(ctx, uplink, metav1.ConditionFalse, "MasterFailed", err.Error())
 			return ctrl.Result{}, err
 		}
 	}
 
 	// Bring bond up
-	if err := execCmd("ip", "link", "set", bondName, "up"); err != nil {
+	if err := helper.ExecCmd("ip", "link", "set", bondName, "up"); err != nil {
 		r.setReadyCondition(ctx, uplink, metav1.ConditionFalse, "UpFailed", err.Error())
 		return ctrl.Result{}, err
 	}
 
 	// Configure bridge port VLAN settings (only when device is a bridge slave)
-	if isBridgeSlave(bondName) && uplink.Spec.PortVLANConfig != nil {
-		if err := applyPortVLANConfig(bondName, uplink.Spec.PortVLANConfig); err != nil {
+	if helper.IsBridgeSlave(bondName) && uplink.Spec.PortVLANConfig != nil {
+		if err := helper.ApplyPortVLANConfig(bondName, uplink.Spec.PortVLANConfig); err != nil {
 			r.setReadyCondition(ctx, uplink, metav1.ConditionFalse, "VLANConfigFailed", err.Error())
 			return ctrl.Result{}, err
 		}
@@ -139,9 +140,9 @@ func (r *UplinkReconciler) onChange(ctx context.Context, _ ctrl.Request, uplink 
 func (r *UplinkReconciler) onDelete(ctx context.Context, _ ctrl.Request, uplink *kvnetv1alpha1.Uplink) (ctrl.Result, error) {
 	log := logf.FromContext(ctx)
 
-	bondName, err := parseDeviceName(uplink.Name, r.NodeName)
+	bondName, err := helper.ParseDeviceName(uplink.Name, r.NodeName)
 	if err == nil {
-		if delErr := execCmd("ip", "link", "del", bondName); delErr != nil {
+		if delErr := helper.ExecCmd("ip", "link", "del", bondName); delErr != nil {
 			log.Info("bond already removed or failed to delete", "name", bondName, "error", delErr)
 		}
 		if err := r.labelNode(ctx, bondName, ""); err != nil {
