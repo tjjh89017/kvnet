@@ -19,7 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"net"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -85,118 +84,17 @@ func (r *VXLANReconciler) onChange(ctx context.Context, _ ctrl.Request, vxlan *k
 		return ctrl.Result{}, err
 	}
 
-	// Check if VXLAN exists, create if not
-	if err := execCmd("ip", "link", "show", "dev", vxlanDevName); err != nil {
-		log.Info("creating VXLAN", "name", vxlanDevName, "external", vxlan.Spec.External)
-
-		if vxlan.Spec.External {
-			// Single VXLAN device mode
-			args := []string{"link", "add", vxlanDevName, "type", "vxlan", "external", "dstport", "4789"}
-			if vxlan.Spec.VNIFilter {
-				args = append(args, "vnifilter")
-			}
-			if err := execCmd("ip", args...); err != nil {
-				r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())
-				return ctrl.Result{}, err
-			}
-		} else {
-			// Classic per-VNI mode: use Spec.VNI if set, otherwise fall back to template VXLANID
-			vxlanID := vxlan.Spec.VNI
-			if vxlanID == 0 {
-				vxlanID, err = r.resolveVXLANID(ctx, vxlan)
-				if err != nil {
-					r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ResolveIDFailed", err.Error())
-					return ctrl.Result{}, err
-				}
-			}
-			if err := execCmd("ip", "link", "add", vxlanDevName, "type", "vxlan", "id", strconv.Itoa(vxlanID), "dstport", "4789"); err != nil {
-				r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())
-				return ctrl.Result{}, err
-			}
-		}
-	}
-
-	// Resolve local IP
-	localIP := vxlan.Spec.LocalIP
-	if localIP == "" && vxlan.Spec.Dev != "" {
-		localIP, err = getInterfaceIP(vxlan.Spec.Dev)
-		if err != nil {
-			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "LocalIPFailed", err.Error())
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Set local IP
-	if localIP != "" {
-		if err := execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "local", localIP); err != nil {
-			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ConfigFailed", err.Error())
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Set MTU only when non-zero
-	if vxlan.Spec.MTU > 0 {
-		if err := execCmd("ip", "link", "set", vxlanDevName, "mtu", strconv.Itoa(vxlan.Spec.MTU)); err != nil {
-			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "MTUFailed", err.Error())
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Set master bridge if specified
-	if vxlan.Spec.Master != "" {
-		if err := execCmd("ip", "link", "set", vxlanDevName, "master", vxlan.Spec.Master); err != nil {
-			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "MasterFailed", err.Error())
-			return ctrl.Result{}, err
-		}
-	}
-
-	// Set VXLAN VTEP learning (kernel vxlan driver)
-	if vxlan.Spec.Learning {
-		_ = execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "learning")
-	} else {
-		_ = execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "nolearning")
-	}
-
-	// Bring up
-	if err := execCmd("ip", "link", "set", vxlanDevName, "up"); err != nil {
-		r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "UpFailed", err.Error())
+	if err := r.ensureVXLANDevice(ctx, vxlan, vxlanDevName); err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Add VNIs for vnifilter mode (applied on the VXLAN device, not bridge-slave-gated)
-	if vxlan.Spec.VNIFilter && vxlan.Spec.PortVLANConfig != nil {
-		for _, mapping := range vxlan.Spec.PortVLANConfig.TunnelInfo {
-			vidEnd := mapping.Vid
-			if mapping.VidEnd != nil {
-				vidEnd = *mapping.VidEnd
-			}
-			for i := 0; i <= vidEnd-mapping.Vid; i++ {
-				vni := mapping.Vni + i
-				if err := execCmd("bridge", "vni", "add", "dev", vxlanDevName, "vni", strconv.Itoa(vni)); err != nil {
-					log.Error(err, "failed to add vni", "dev", vxlanDevName, "vni", vni)
-				}
-			}
-		}
+	localIP, err := r.configureVXLANDevice(ctx, vxlan, vxlanDevName)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
-	// Bridge slave settings: only apply when device is actually a bridge slave
-	if isBridgeSlave(vxlanDevName) {
-		// Set bridge slave MAC learning
-		bridgeLearning := "off"
-		if vxlan.Spec.BridgeLearning {
-			bridgeLearning = "on"
-		}
-		if err := execCmd("bridge", "link", "set", "dev", vxlanDevName, "learning", bridgeLearning); err != nil {
-			log.Error(err, "failed to set bridge learning", "dev", vxlanDevName)
-		}
-
-		// Configure bridge port VLAN settings
-		if vxlan.Spec.PortVLANConfig != nil {
-			if err := applyPortVLANConfig(vxlanDevName, vxlan.Spec.PortVLANConfig); err != nil {
-				r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "VLANConfigFailed", err.Error())
-				return ctrl.Result{}, err
-			}
-		}
+	if err := r.applyBridgeSlaveSettings(ctx, vxlan, vxlanDevName); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// Label the node
@@ -216,6 +114,130 @@ func (r *VXLANReconciler) onChange(ctx context.Context, _ ctrl.Request, vxlan *k
 	r.setReadyCondition(ctx, vxlan, metav1.ConditionTrue, "Configured", "VXLAN configured successfully.")
 	log.Info("VXLAN configured", "name", vxlanDevName, "localIP", localIP)
 	return ctrl.Result{}, nil
+}
+
+func (r *VXLANReconciler) ensureVXLANDevice(ctx context.Context, vxlan *kvnetv1alpha1.VXLAN, vxlanDevName string) error {
+	if err := execCmd("ip", "link", "show", "dev", vxlanDevName); err == nil {
+		return nil
+	}
+
+	logf.FromContext(ctx).Info("creating VXLAN", "name", vxlanDevName, "external", vxlan.Spec.External)
+
+	if vxlan.Spec.External {
+		args := []string{"link", "add", vxlanDevName, "type", "vxlan", "external", "dstport", "4789"}
+		if vxlan.Spec.VNIFilter {
+			args = append(args, "vnifilter")
+		}
+		if err := execCmd("ip", args...); err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())
+			return err
+		}
+		return nil
+	}
+
+	vxlanID := vxlan.Spec.VNI
+	if vxlanID == 0 {
+		var err error
+		vxlanID, err = r.resolveVXLANID(ctx, vxlan)
+		if err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ResolveIDFailed", err.Error())
+			return err
+		}
+	}
+	if err := execCmd("ip", "link", "add", vxlanDevName, "type", "vxlan", "id", strconv.Itoa(vxlanID), "dstport", "4789"); err != nil {
+		r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())
+		return err
+	}
+	return nil
+}
+
+func (r *VXLANReconciler) configureVXLANDevice(ctx context.Context, vxlan *kvnetv1alpha1.VXLAN, vxlanDevName string) (string, error) {
+	localIP := vxlan.Spec.LocalIP
+	if localIP == "" && vxlan.Spec.Dev != "" {
+		var err error
+		localIP, err = getInterfaceIP(vxlan.Spec.Dev)
+		if err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "LocalIPFailed", err.Error())
+			return "", err
+		}
+	}
+
+	if localIP != "" {
+		if err := execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "local", localIP); err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ConfigFailed", err.Error())
+			return "", err
+		}
+	}
+
+	if vxlan.Spec.MTU > 0 {
+		if err := execCmd("ip", "link", "set", vxlanDevName, "mtu", strconv.Itoa(vxlan.Spec.MTU)); err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "MTUFailed", err.Error())
+			return "", err
+		}
+	}
+
+	if vxlan.Spec.Master != "" {
+		if err := execCmd("ip", "link", "set", vxlanDevName, "master", vxlan.Spec.Master); err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "MasterFailed", err.Error())
+			return "", err
+		}
+	}
+
+	if vxlan.Spec.Learning {
+		_ = execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "learning")
+	} else {
+		_ = execCmd("ip", "link", "set", vxlanDevName, "type", "vxlan", "nolearning")
+	}
+
+	if err := execCmd("ip", "link", "set", vxlanDevName, "up"); err != nil {
+		r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "UpFailed", err.Error())
+		return "", err
+	}
+
+	if vxlan.Spec.VNIFilter && vxlan.Spec.PortVLANConfig != nil {
+		applyVNIFilter(ctx, vxlanDevName, vxlan.Spec.PortVLANConfig.TunnelInfo)
+	}
+
+	return localIP, nil
+}
+
+func applyVNIFilter(ctx context.Context, devName string, tunnelInfo []kvnetv1alpha1.VLANTunnelMapping) {
+	log := logf.FromContext(ctx)
+	for _, mapping := range tunnelInfo {
+		vidEnd := mapping.Vid
+		if mapping.VidEnd != nil {
+			vidEnd = *mapping.VidEnd
+		}
+		for i := 0; i <= vidEnd-mapping.Vid; i++ {
+			vni := mapping.Vni + i
+			if err := execCmd("bridge", "vni", "add", "dev", devName, "vni", strconv.Itoa(vni)); err != nil {
+				log.Error(err, "failed to add vni", "dev", devName, "vni", vni)
+			}
+		}
+	}
+}
+
+func (r *VXLANReconciler) applyBridgeSlaveSettings(ctx context.Context, vxlan *kvnetv1alpha1.VXLAN, vxlanDevName string) error {
+	log := logf.FromContext(ctx)
+	if !isBridgeSlave(vxlanDevName) {
+		return nil
+	}
+
+	bridgeLearning := "off"
+	if vxlan.Spec.BridgeLearning {
+		bridgeLearning = "on"
+	}
+	if err := execCmd("bridge", "link", "set", "dev", vxlanDevName, "learning", bridgeLearning); err != nil {
+		log.Error(err, "failed to set bridge learning", "dev", vxlanDevName)
+	}
+
+	if vxlan.Spec.PortVLANConfig != nil {
+		if err := applyPortVLANConfig(vxlanDevName, vxlan.Spec.PortVLANConfig); err != nil {
+			r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "VLANConfigFailed", err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *VXLANReconciler) onRemoteChange(ctx context.Context, _ ctrl.Request, vxlan *kvnetv1alpha1.VXLAN) (ctrl.Result, error) {
@@ -334,55 +356,4 @@ func (r *VXLANReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kvnetv1alpha1.VXLAN{}).
 		Named("vxlan").
 		Complete(r)
-}
-
-// applyPortVLANConfig configures bridge port VLAN settings for a device.
-func applyPortVLANConfig(devName string, cfg *kvnetv1alpha1.PortVLANConfig) error {
-	// Set pvid (native VLAN)
-	if cfg.Pvid != nil {
-		if err := execCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(*cfg.Pvid), "pvid", "untagged"); err != nil {
-			return fmt.Errorf("set pvid %d on %s: %w", *cfg.Pvid, devName, err)
-		}
-	}
-
-	// Set trunk VLANs
-	for _, vid := range cfg.Vids {
-		if err := execCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(vid)); err != nil {
-			return fmt.Errorf("add vid %d on %s: %w", vid, devName, err)
-		}
-	}
-
-	// Set VLAN-to-VNI tunnel mappings (for single VXLAN device mode)
-	for _, mapping := range cfg.TunnelInfo {
-		vidEnd := mapping.Vid
-		if mapping.VidEnd != nil {
-			vidEnd = *mapping.VidEnd
-		}
-		for i := 0; i <= vidEnd-mapping.Vid; i++ {
-			vid := mapping.Vid + i
-			vni := mapping.Vni + i
-			if err := execCmd("bridge", "vlan", "add", "dev", devName, "vid", strconv.Itoa(vid), "tunnel_info", "id", strconv.Itoa(vni)); err != nil {
-				return fmt.Errorf("add tunnel_info vid=%d vni=%d on %s: %w", vid, vni, devName, err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func getInterfaceIP(devName string) (string, error) {
-	iface, err := net.InterfaceByName(devName)
-	if err != nil {
-		return "", fmt.Errorf("interface %q not found: %w", devName, err)
-	}
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return "", fmt.Errorf("get addrs for %q: %w", devName, err)
-	}
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
-			return ipnet.IP.String(), nil
-		}
-	}
-	return "", fmt.Errorf("no IPv4 address found on %q", devName)
 }

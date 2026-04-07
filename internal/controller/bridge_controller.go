@@ -19,8 +19,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -183,34 +181,4 @@ func (r *BridgeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&kvnetv1alpha1.Bridge{}).
 		Named("bridge").
 		Complete(r)
-}
-
-// parseDeviceName extracts the device name from the CR name format "{nodeName}.{deviceName}"
-func parseDeviceName(crName, nodeName string) (string, error) {
-	prefix := nodeName + "."
-	if !strings.HasPrefix(crName, prefix) {
-		return "", fmt.Errorf("CR name %q does not match node %q", crName, nodeName)
-	}
-	return strings.TrimPrefix(crName, prefix), nil
-}
-
-// execCmd runs a command and returns an error if it fails
-func execCmd(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("command %q failed: %w, output: %s", append([]string{name}, args...), err, string(output))
-	}
-	return nil
-}
-
-// isBridgeSlave checks if a network device is attached to a bridge as a slave.
-// Uses `ip -d link show dev {name}` and checks for "bridge_slave" in the output.
-func isBridgeSlave(devName string) bool {
-	cmd := exec.Command("ip", "-d", "link", "show", "dev", devName)
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(output), "bridge_slave")
 }
