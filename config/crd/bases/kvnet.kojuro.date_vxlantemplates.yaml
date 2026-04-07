@@ -143,14 +143,22 @@ spec:
                             description: TunnelInfo maps VIDs to VNIs for VXLAN tunnel
                               (single VXLAN device mode).
                             items:
-                              description: VLANTunnelMapping maps a VLAN ID to a VXLAN
-                                Network Identifier.
+                              description: |-
+                                VLANTunnelMapping maps a VLAN ID (or range) to a VXLAN Network Identifier.
+                                When VidEnd is set, maps vid..vidEnd to vni..vni+(vidEnd-vid) consecutively.
                               properties:
                                 vid:
-                                  description: Vid is the VLAN ID.
+                                  description: Vid is the VLAN ID (or start of range
+                                    when VidEnd is set).
+                                  type: integer
+                                vidEnd:
+                                  description: |-
+                                    VidEnd is the inclusive end of the VLAN range.
+                                    When set, maps vid..vidEnd to vni..vni+(vidEnd-vid).
                                   type: integer
                                 vni:
-                                  description: Vni is the VXLAN Network Identifier.
+                                  description: Vni is the VXLAN Network Identifier
+                                    (or start of VNI range).
                                   type: integer
                               required:
                               - vid
@@ -164,6 +172,17 @@ spec:
                               type: integer
                             type: array
                         type: object
+                      vni:
+                        description: |-
+                          VNI is the VXLAN Network Identifier used in traditional (non-external) mode.
+                          Ignored when External is true.
+                        type: integer
+                      vniFilter:
+                        description: |-
+                          VNIFilter enables per-VNI filtering on the VXLAN device.
+                          Only VNIs explicitly added via bridge vni add are accepted.
+                          Requires External: true.
+                        type: boolean
                     type: object
                 required:
                 - spec
