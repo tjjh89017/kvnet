@@ -100,11 +100,14 @@ func (r *VXLANReconciler) onChange(ctx context.Context, _ ctrl.Request, vxlan *k
 				return ctrl.Result{}, err
 			}
 		} else {
-			// Classic per-VNI mode
-			vxlanID, err := r.resolveVXLANID(ctx, vxlan)
-			if err != nil {
-				r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ResolveIDFailed", err.Error())
-				return ctrl.Result{}, err
+			// Classic per-VNI mode: use Spec.VNI if set, otherwise fall back to template VXLANID
+			vxlanID := vxlan.Spec.VNI
+			if vxlanID == 0 {
+				vxlanID, err = r.resolveVXLANID(ctx, vxlan)
+				if err != nil {
+					r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "ResolveIDFailed", err.Error())
+					return ctrl.Result{}, err
+				}
 			}
 			if err := execCmd("ip", "link", "add", vxlanDevName, "type", "vxlan", "id", strconv.Itoa(vxlanID), "dstport", "4789"); err != nil {
 				r.setReadyCondition(ctx, vxlan, metav1.ConditionFalse, "CreateFailed", err.Error())

@@ -22,6 +22,11 @@ import (
 
 // VXLANSpec defines the desired state of VXLAN.
 type VXLANSpec struct {
+	// VNI is the VXLAN Network Identifier used in traditional (non-external) mode.
+	// Ignored when External is true.
+	// +optional
+	VNI int `json:"vni,omitempty"`
+
 	// Master is the bridge device this VXLAN is attached to.
 	// +optional
 	Master string `json:"master,omitempty"`
