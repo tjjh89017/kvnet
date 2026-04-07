@@ -1,0 +1,13 @@
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: BridgeTemplate
+metadata:
+  name: br0
+spec:
+  bridgeName: br0
+  nodeSelector:
+    matchLabels:
+      kvnet.kojuro.date/role: worker
+  template:
+    spec:
+      vlanFiltering: true
+      nfCallIptables: false

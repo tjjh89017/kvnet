@@ -3,16 +3,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 log() { echo "==> $*"; }
 
 # ── apply templates ───────────────────────────────────────────────────────────
 log "Applying BridgeTemplate..."
-kubectl apply -f "$REPO_DIR/config/samples/kvnet_v1alpha1_bridgetemplate.yaml"
+kubectl apply -f "$SCRIPT_DIR/samples/bridgetemplate.yaml"
 
 log "Applying VXLANTemplate..."
-kubectl apply -f "$REPO_DIR/config/samples/kvnet_v1alpha1_vxlantemplate.yaml"
+kubectl apply -f "$SCRIPT_DIR/samples/vxlantemplate.yaml"
 
 # ── count expected nodes ──────────────────────────────────────────────────────
 WORKER_COUNT=$(kubectl get nodes -l kvnet.kojuro.date/role=worker --no-headers 2>/dev/null | wc -l | tr -d ' ')
