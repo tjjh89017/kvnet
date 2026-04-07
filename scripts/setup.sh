@@ -103,12 +103,6 @@ kubectl wait deployment/kvnet-controller-manager \
   --for=condition=Available \
   --timeout=3m
 
-# ── deploy agent ──────────────────────────────────────────────────────────────
-log "Deploying kvnet agent DaemonSet..."
-# Substitute the image name into the manifest
-sed "s|kvnet:dev|${IMG}|g" "$SCRIPT_DIR/agent-daemonset.yaml" \
-  | kubectl apply -f -
-
 log "Waiting for kvnet-agent DaemonSet rollout..."
 kubectl rollout status daemonset/kvnet-agent -n kvnet-system --timeout=3m
 

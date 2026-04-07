@@ -1,10 +1,11 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: kvnet-agent
-  namespace: kvnet-system
+  name: agent
+  namespace: system
   labels:
     app.kubernetes.io/name: kvnet
+    app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/component: agent
 spec:
   selector:
@@ -17,17 +18,19 @@ spec:
         app.kubernetes.io/name: kvnet
         app.kubernetes.io/component: agent
     spec:
-      serviceAccountName: kvnet-controller-manager
+      serviceAccountName: controller-manager
       hostNetwork: true
       hostPID: true
       tolerations:
         - operator: Exists
+      # Disable seccomp filtering so privileged network syscalls are allowed
+      # inside the KIND node (or any container-based node) environment.
       securityContext:
         seccompProfile:
           type: Unconfined
       containers:
         - name: agent
-          image: kvnet:dev
+          image: controller:latest
           args:
             - --agent
             - --health-probe-bind-address=:8082
@@ -36,6 +39,10 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+          # Must run as root (uid=0) so that child processes spawned via
+          # os/exec (ip, bridge, etc.) inherit Linux capabilities correctly.
+          # Non-root uid causes CapEff to drop to zero on exec even with
+          # privileged: true.
           securityContext:
             privileged: true
             runAsUser: 0
