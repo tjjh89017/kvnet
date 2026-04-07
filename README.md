@@ -81,23 +81,30 @@ tunnelInfo:
 
 ## Testing with KIND
 
+Scripts in `scripts/` automate the full local test cycle.
+
 ```sh
-# 1. Create a 4-node cluster
-kind create cluster --config hack/kind.yaml
+# 1. Create cluster, install cert-manager, build image, deploy manager + agent
+IMG=kvnet:dev scripts/setup.sh
 
-# 2. Install cert-manager (required for webhooks)
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.11.0/cert-manager.yaml
+# 2. Apply BridgeTemplate + VXLANTemplate, verify per-node CRs are created
+scripts/apply-samples.sh
 
-# 3. Build and deploy
-make docker-build deploy IMG="tjjh89017/kvnet:v0.0.1"
+# 3. Watch agent reconcile network devices on each node
+kubectl logs -n kvnet-system -l app.kubernetes.io/component=agent -f
 
-# 4. Apply sample resources
-kubectl apply -f config/samples/kvnet_v1alpha1_bridgetemplate.yaml
-kubectl apply -f config/samples/kvnet_v1alpha1_vxlantemplate.yaml
-kubectl apply -f config/samples/kvnet_v1alpha1_uplinktemplate.yaml
+# 4. Clean up
+scripts/teardown.sh
 ```
 
-Change node labels and template `nodeSelector` fields to control which nodes receive which network configuration.
+`scripts/kind.yaml` creates 1 control-plane + 2 worker nodes. `setup.sh` automatically labels worker nodes with `kvnet.kojuro.date/role=worker`, which the sample templates use as their `nodeSelector`.
+
+To test with a custom image:
+```sh
+IMG=myregistry/kvnet:test scripts/setup.sh
+```
+
+The agent DaemonSet (`scripts/agent-daemonset.yaml`) runs privileged with `hostNetwork: true` so it can configure network interfaces on the host. This is separate from the manager Deployment and is required for Bridge/VXLAN/Uplink CRs to be reconciled on nodes.
 
 ## Building
 
