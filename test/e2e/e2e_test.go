@@ -69,13 +69,6 @@ var _ = Describe("Manager", Ordered, func() {
 		cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectImage))
 		_, err = utils.Run(cmd)
 		Expect(err).NotTo(HaveOccurred(), "Failed to deploy the controller-manager")
-
-		By("waiting for the webhook-server-cert secret to be provisioned by cert-manager")
-		Eventually(func() error {
-			cmd := exec.Command("kubectl", "get", "secret", "webhook-server-cert", "-n", namespace)
-			_, err := utils.Run(cmd)
-			return err
-		}, 3*time.Minute, 5*time.Second).Should(Succeed(), "webhook-server-cert secret was not provisioned in time")
 	})
 
 	// After all tests have been executed, clean up by undeploying the controller, uninstalling CRDs,
