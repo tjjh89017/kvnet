@@ -23,13 +23,46 @@ wait_for_secret() {
   done
 }
 
+# ── kubeconfig merge helper ───────────────────────────────────────────────────
+# Write KIND kubeconfig to a temp file, then merge it into ~/.kube/config so
+# the existing contexts are preserved. Falls back to creating ~/.kube/config
+# if it does not yet exist.
+merge_kubeconfig() {
+  local tmp_cfg
+  tmp_cfg="$(mktemp /tmp/kind-${CLUSTER_NAME}-XXXXXX.yaml)"
+  kind get kubeconfig --name "$CLUSTER_NAME" > "$tmp_cfg"
+
+  local kube_dir="$HOME/.kube"
+  local kube_cfg="$kube_dir/config"
+  mkdir -p "$kube_dir"
+
+  if [[ -f "$kube_cfg" ]]; then
+    local backup="${kube_cfg}.bak.$(date +%Y%m%d%H%M%S)"
+    cp "$kube_cfg" "$backup"
+    log "Backed up existing kubeconfig to $backup"
+    KUBECONFIG="${kube_cfg}:${tmp_cfg}" kubectl config view --flatten > "${kube_cfg}.merged"
+    mv "${kube_cfg}.merged" "$kube_cfg"
+  else
+    cp "$tmp_cfg" "$kube_cfg"
+  fi
+
+  rm -f "$tmp_cfg"
+  log "Merged context 'kind-${CLUSTER_NAME}' into $kube_cfg"
+}
+
 # ── cluster ───────────────────────────────────────────────────────────────────
 if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
   log "KIND cluster '$CLUSTER_NAME' already exists, skipping creation."
 else
   log "Creating KIND cluster '$CLUSTER_NAME'..."
-  kind create cluster --name "$CLUSTER_NAME" --config "$SCRIPT_DIR/kind.yaml"
+  # --kubeconfig="" prevents kind from touching ~/.kube/config directly;
+  # we handle the merge ourselves below.
+  kind create cluster --name "$CLUSTER_NAME" --config "$SCRIPT_DIR/kind.yaml" --kubeconfig=""
+  merge_kubeconfig
 fi
+
+log "Switching to context 'kind-${CLUSTER_NAME}'..."
+kubectl config use-context "kind-${CLUSTER_NAME}"
 
 # Label worker nodes so nodeSelector in templates can target them
 log "Labeling worker nodes with kvnet.kojuro.date/role=worker..."
@@ -83,7 +116,12 @@ kubectl rollout status daemonset/kvnet-agent -n kvnet-system --timeout=3m
 echo ""
 echo "Setup complete."
 echo "  Cluster : $CLUSTER_NAME"
-echo "  Context : kind-$CLUSTER_NAME"
+echo "  Context : kind-$CLUSTER_NAME  (already active)"
+echo ""
+echo "Switch context:"
+echo "  kubectl config use-context kind-$CLUSTER_NAME"
+echo "  kubectl config use-context <other-context>     # switch back"
+echo "  kubectl config get-contexts                    # list all"
 echo ""
 echo "Next steps:"
 echo "  Apply sample resources : scripts/apply-samples.sh"
