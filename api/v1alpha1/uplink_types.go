@@ -1,5 +1,5 @@
 /*
-Copyright 2023.
+Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,33 +20,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-const (
-	UplinkFinalizer = "uplink.kvnet.kojuro.date/finalizer"
-	UplinkNodeLabel = "uplink.kvnet.kojuro.date/"
-)
-
-// UplinkSpec defines the desired state of Uplink
+// UplinkSpec defines the desired state of Uplink.
 type UplinkSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Master is the bridge device this uplink is attached to.
+	// +optional
+	Master string `json:"master,omitempty"`
 
-	Master     string   `json:"master,omitempty"`
-	BondMode   string   `json:"mode,omitempty"`
-	BondSlaves []string `json:"slaves,omitempty"`
+	// BondMode is the bonding mode (e.g., balance-rr, active-backup, 802.3ad).
+	// +optional
+	BondMode string `json:"bondMode,omitempty"`
+
+	// BondSlaves is the list of slave interfaces for bonding.
+	// +optional
+	BondSlaves []string `json:"bondSlaves,omitempty"`
+
+	// PortVLANConfig defines bridge port VLAN settings for this uplink.
+	// +optional
+	PortVLANConfig *PortVLANConfig `json:"portVLANConfig,omitempty"`
 }
 
-// UplinkStatus defines the observed state of Uplink
+// UplinkStatus defines the observed state of Uplink.
 type UplinkStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Conditions represent the latest available observations of the Uplink's state.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// Uplink is the Schema for the uplinks API
+// Uplink is the Schema for the uplinks API.
 type Uplink struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -55,9 +59,9 @@ type Uplink struct {
 	Status UplinkStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
-// UplinkList contains a list of Uplink
+// UplinkList contains a list of Uplink.
 type UplinkList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

@@ -1,5 +1,5 @@
 /*
-Copyright 2023.
+Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,31 +20,34 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-const (
-	BridgeFinalizer = "bridge.kvnet.kojuro.date/finalizer"
-	BridgeNodeLabel = "bridge.kvnet.kojuro.date/"
-)
-
-// BridgeSpec defines the desired state of Bridge
+// BridgeSpec defines the desired state of Bridge.
 type BridgeSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
+	// VlanFiltering enables or disables VLAN filtering on the bridge.
+	// +optional
 	VlanFiltering bool `json:"vlanFiltering,omitempty"`
+
+	// VniFilter enables per-VLAN VNI filtering on the bridge (for single VXLAN device mode).
+	// +optional
+	VniFilter bool `json:"vniFilter,omitempty"`
+
+	// NfCallIptables enables or disables nf_call_iptables on the bridge.
+	// +kubebuilder:default=false
+	// +optional
+	NfCallIptables bool `json:"nfCallIptables,omitempty"`
 }
 
-// BridgeStatus defines the observed state of Bridge
+// BridgeStatus defines the observed state of Bridge.
 type BridgeStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Conditions represent the latest available observations of the Bridge's state.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// Bridge is the Schema for the bridges API
+// Bridge is the Schema for the bridges API.
 type Bridge struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -53,9 +56,9 @@ type Bridge struct {
 	Status BridgeStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
-// BridgeList contains a list of Bridge
+// BridgeList contains a list of Bridge.
 type BridgeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

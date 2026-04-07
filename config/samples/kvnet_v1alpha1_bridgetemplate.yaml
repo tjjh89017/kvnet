@@ -1,0 +1,9 @@
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: BridgeTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: kvnet
+    app.kubernetes.io/managed-by: kustomize
+  name: bridgetemplate-sample
+spec:
+  # TODO(user): Add fields here

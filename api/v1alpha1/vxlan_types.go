@@ -1,5 +1,5 @@
 /*
-Copyright 2023.
+Copyright 2026.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,55 +20,90 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-const (
-	VxlanFinalizer = "vxlan.kvnet.kojuro.date/finalizer"
-	VxlanNodeLabel = "vxlan.kvnet.kojuro.date/"
-)
+// VXLANSpec defines the desired state of VXLAN.
+type VXLANSpec struct {
+	// Master is the bridge device this VXLAN is attached to.
+	// +optional
+	Master string `json:"master,omitempty"`
 
-// VxlanSpec defines the desired state of Vxlan
-type VxlanSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	Master   string `json:"master,omitempty"`
-	MTU      int    `json:"mtu,omitempty"`
-	Dev      string `json:"dev,omitempty"`
-	LocalIP  string `json:"localIP,omitempty"`
-	Learning bool   `json:"learning,omitempty"`
-}
-
-// VxlanStatus defines the observed state of Vxlan
-type VxlanStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// LocalIP is the source IP for VXLAN encapsulation.
+	// If empty, the agent will auto-detect from the Dev interface.
+	// +optional
 	LocalIP string `json:"localIP,omitempty"`
+
+	// Dev is the device used to determine the local IP for VXLAN.
+	// +optional
+	Dev string `json:"dev,omitempty"`
+
+	// MTU for the VXLAN interface. Default 0 means do not set (use system default).
+	// Only applied when non-zero.
+	// +optional
+	MTU int `json:"mtu,omitempty"`
+
+	// Learning enables or disables dynamic VTEP learning on the VXLAN interface.
+	// This is the kernel vxlan driver's [no]learning setting.
+	// Set via: ip link set {dev} type vxlan [no]learning
+	// Should be disabled for EVPN setups.
+	// +optional
+	Learning bool `json:"learning,omitempty"`
+
+	// BridgeLearning enables or disables dynamic MAC learning on the bridge port.
+	// This is the kernel bridge driver's per-port learning setting.
+	// Set via: bridge link set dev {dev} learning {on|off}
+	// Should be disabled for EVPN setups.
+	// +optional
+	BridgeLearning bool `json:"bridgeLearning,omitempty"`
+
+	// External enables single VXLAN device mode (collect_metadata).
+	// When true, VXLANID from template is ignored; VNI mapping is done via
+	// bridge VLAN tunnel_info in PortVLANConfig.
+	// +optional
+	External bool `json:"external,omitempty"`
+
+	// VNIFilter enables per-VNI filtering on the VXLAN device.
+	// Only VNIs explicitly added via bridge vni add are accepted.
+	// Requires External: true.
+	// +optional
+	VNIFilter bool `json:"vniFilter,omitempty"`
+
+	// PortVLANConfig defines bridge port VLAN settings for this VXLAN device.
+	// +optional
+	PortVLANConfig *PortVLANConfig `json:"portVLANConfig,omitempty"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:scope=Cluster
-// +genclient:nonNamespaced
+// VXLANStatus defines the observed state of VXLAN.
+type VXLANStatus struct {
+	// LocalIP is the observed local IP address used for this VXLAN.
+	// +optional
+	LocalIP string `json:"localIP,omitempty"`
 
-// Vxlan is the Schema for the vxlans API
-type Vxlan struct {
+	// Conditions represent the latest available observations of the VXLAN's state.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
+
+// VXLAN is the Schema for the vxlans API.
+type VXLAN struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   VxlanSpec   `json:"spec,omitempty"`
-	Status VxlanStatus `json:"status,omitempty"`
+	Spec   VXLANSpec   `json:"spec,omitempty"`
+	Status VXLANStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
-// VxlanList contains a list of Vxlan
-type VxlanList struct {
+// VXLANList contains a list of VXLAN.
+type VXLANList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []Vxlan `json:"items"`
+	Items           []VXLAN `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&Vxlan{}, &VxlanList{})
+	SchemeBuilder.Register(&VXLAN{}, &VXLANList{})
 }

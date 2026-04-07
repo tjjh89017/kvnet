@@ -2,7 +2,6 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: mutating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
@@ -13,7 +12,7 @@ webhooks:
       namespace: system
       path: /mutate-kvnet-kojuro-date-v1alpha1-bridge
   failurePolicy: Fail
-  name: mbridge.kb.io
+  name: mbridge-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -31,9 +30,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-kvnet-kojuro-date-v1alpha1-bridgeconfig
+      path: /mutate-kvnet-kojuro-date-v1alpha1-bridgetemplate
   failurePolicy: Fail
-  name: mbridgeconfig.kb.io
+  name: mbridgetemplate-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -43,47 +42,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - bridgeconfigs
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-kvnet-kojuro-date-v1alpha1-router
-  failurePolicy: Fail
-  name: mrouter.kb.io
-  rules:
-  - apiGroups:
-    - kvnet.kojuro.date
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - routers
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /mutate-kvnet-kojuro-date-v1alpha1-subnet
-  failurePolicy: Fail
-  name: msubnet.kb.io
-  rules:
-  - apiGroups:
-    - kvnet.kojuro.date
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - subnets
+    - bridgetemplates
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -93,7 +52,7 @@ webhooks:
       namespace: system
       path: /mutate-kvnet-kojuro-date-v1alpha1-uplink
   failurePolicy: Fail
-  name: muplink.kb.io
+  name: muplink-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -111,9 +70,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-kvnet-kojuro-date-v1alpha1-uplinkconfig
+      path: /mutate-kvnet-kojuro-date-v1alpha1-uplinktemplate
   failurePolicy: Fail
-  name: muplinkconfig.kb.io
+  name: muplinktemplate-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -123,7 +82,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - uplinkconfigs
+    - uplinktemplates
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -133,7 +92,7 @@ webhooks:
       namespace: system
       path: /mutate-kvnet-kojuro-date-v1alpha1-vxlan
   failurePolicy: Fail
-  name: mvxlan.kb.io
+  name: mvxlan-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -151,9 +110,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /mutate-kvnet-kojuro-date-v1alpha1-vxlanconfig
+      path: /mutate-kvnet-kojuro-date-v1alpha1-vxlantemplate
   failurePolicy: Fail
-  name: mvxlanconfig.kb.io
+  name: mvxlantemplate-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -163,13 +122,12 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - vxlanconfigs
+    - vxlantemplates
   sideEffects: None
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:
@@ -180,7 +138,7 @@ webhooks:
       namespace: system
       path: /validate-kvnet-kojuro-date-v1alpha1-bridge
   failurePolicy: Fail
-  name: vbridge.kb.io
+  name: vbridge-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -198,9 +156,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-kvnet-kojuro-date-v1alpha1-bridgeconfig
+      path: /validate-kvnet-kojuro-date-v1alpha1-bridgetemplate
   failurePolicy: Fail
-  name: vbridgeconfig.kb.io
+  name: vbridgetemplate-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -210,47 +168,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - bridgeconfigs
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-kvnet-kojuro-date-v1alpha1-router
-  failurePolicy: Fail
-  name: vrouter.kb.io
-  rules:
-  - apiGroups:
-    - kvnet.kojuro.date
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - routers
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-kvnet-kojuro-date-v1alpha1-subnet
-  failurePolicy: Fail
-  name: vsubnet.kb.io
-  rules:
-  - apiGroups:
-    - kvnet.kojuro.date
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - subnets
+    - bridgetemplates
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -260,7 +178,7 @@ webhooks:
       namespace: system
       path: /validate-kvnet-kojuro-date-v1alpha1-uplink
   failurePolicy: Fail
-  name: vuplink.kb.io
+  name: vuplink-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -278,9 +196,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-kvnet-kojuro-date-v1alpha1-uplinkconfig
+      path: /validate-kvnet-kojuro-date-v1alpha1-uplinktemplate
   failurePolicy: Fail
-  name: vuplinkconfig.kb.io
+  name: vuplinktemplate-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -290,7 +208,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - uplinkconfigs
+    - uplinktemplates
   sideEffects: None
 - admissionReviewVersions:
   - v1
@@ -300,7 +218,7 @@ webhooks:
       namespace: system
       path: /validate-kvnet-kojuro-date-v1alpha1-vxlan
   failurePolicy: Fail
-  name: vvxlan.kb.io
+  name: vvxlan-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -318,9 +236,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-kvnet-kojuro-date-v1alpha1-vxlanconfig
+      path: /validate-kvnet-kojuro-date-v1alpha1-vxlantemplate
   failurePolicy: Fail
-  name: vvxlanconfig.kb.io
+  name: vvxlantemplate-v1alpha1.kb.io
   rules:
   - apiGroups:
     - kvnet.kojuro.date
@@ -330,5 +248,5 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - vxlanconfigs
+    - vxlantemplates
   sideEffects: None

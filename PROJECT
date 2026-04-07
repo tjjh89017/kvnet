@@ -4,7 +4,7 @@
 # More info: https://book.kubebuilder.io/reference/project-config.html
 domain: kojuro.date
 layout:
-- go.kubebuilder.io/v3
+- go.kubebuilder.io/v4
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
@@ -17,7 +17,7 @@ resources:
   controller: true
   domain: kojuro.date
   group: kvnet
-  kind: BridgeConfig
+  kind: BridgeTemplate
   path: github.com/tjjh89017/kvnet/api/v1alpha1
   version: v1alpha1
   webhooks:
@@ -43,7 +43,33 @@ resources:
   controller: true
   domain: kojuro.date
   group: kvnet
-  kind: UplinkConfig
+  kind: VXLANTemplate
+  path: github.com/tjjh89017/kvnet/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kojuro.date
+  group: kvnet
+  kind: VXLAN
+  path: github.com/tjjh89017/kvnet/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: kojuro.date
+  group: kvnet
+  kind: UplinkTemplate
   path: github.com/tjjh89017/kvnet/api/v1alpha1
   version: v1alpha1
   webhooks:
@@ -57,61 +83,6 @@ resources:
   domain: kojuro.date
   group: kvnet
   kind: Uplink
-  path: github.com/tjjh89017/kvnet/api/v1alpha1
-  version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
-- controller: true
-  group: k8s.cni.cncf.io
-  kind: NetworkAttachmentDefinition
-  version: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kojuro.date
-  group: kvnet
-  kind: Subnet
-  path: github.com/tjjh89017/kvnet/api/v1alpha1
-  version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kojuro.date
-  group: kvnet
-  kind: Router
-  path: github.com/tjjh89017/kvnet/api/v1alpha1
-  version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
-- api:
-    crdVersion: v1
-  controller: true
-  domain: kojuro.date
-  group: kvnet
-  kind: Vxlan
-  path: github.com/tjjh89017/kvnet/api/v1alpha1
-  version: v1alpha1
-  webhooks:
-    defaulting: true
-    validation: true
-    webhookVersion: v1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: kojuro.date
-  group: kvnet
-  kind: VxlanConfig
   path: github.com/tjjh89017/kvnet/api/v1alpha1
   version: v1alpha1
   webhooks:

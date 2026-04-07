@@ -1,0 +1,9 @@
+apiVersion: kvnet.kojuro.date/v1alpha1
+kind: UplinkTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: kvnet
+    app.kubernetes.io/managed-by: kustomize
+  name: uplinktemplate-sample
+spec:
+  # TODO(user): Add fields here

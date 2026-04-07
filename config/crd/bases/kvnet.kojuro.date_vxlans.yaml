@@ -3,14 +3,13 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.18.0
   name: vxlans.kvnet.kojuro.date
 spec:
   group: kvnet.kojuro.date
   names:
-    kind: Vxlan
-    listKind: VxlanList
+    kind: VXLAN
+    listKind: VXLANList
     plural: vxlans
     singular: vxlan
   scope: Cluster
@@ -18,41 +17,162 @@ spec:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: Vxlan is the Schema for the vxlans API
+        description: VXLAN is the Schema for the vxlans API.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
           spec:
-            description: VxlanSpec defines the desired state of Vxlan
+            description: VXLANSpec defines the desired state of VXLAN.
             properties:
+              bridgeLearning:
+                description: |-
+                  BridgeLearning enables or disables dynamic MAC learning on the bridge port.
+                  This is the kernel bridge driver's per-port learning setting.
+                  Set via: bridge link set dev {dev} learning {on|off}
+                  Should be disabled for EVPN setups.
+                type: boolean
               dev:
+                description: Dev is the device used to determine the local IP for
+                  VXLAN.
                 type: string
+              external:
+                description: |-
+                  External enables single VXLAN device mode (collect_metadata).
+                  When true, VXLANID from template is ignored; VNI mapping is done via
+                  bridge VLAN tunnel_info in PortVLANConfig.
+                type: boolean
               learning:
+                description: |-
+                  Learning enables or disables dynamic VTEP learning on the VXLAN interface.
+                  This is the kernel vxlan driver's [no]learning setting.
+                  Set via: ip link set {dev} type vxlan [no]learning
+                  Should be disabled for EVPN setups.
                 type: boolean
               localIP:
+                description: |-
+                  LocalIP is the source IP for VXLAN encapsulation.
+                  If empty, the agent will auto-detect from the Dev interface.
                 type: string
               master:
+                description: Master is the bridge device this VXLAN is attached to.
                 type: string
               mtu:
+                description: |-
+                  MTU for the VXLAN interface. Default 0 means do not set (use system default).
+                  Only applied when non-zero.
                 type: integer
+              portVLANConfig:
+                description: PortVLANConfig defines bridge port VLAN settings for
+                  this VXLAN device.
+                properties:
+                  pvid:
+                    description: Pvid is the port VLAN ID (native/untagged VLAN).
+                    type: integer
+                  tunnelInfo:
+                    description: TunnelInfo maps VIDs to VNIs for VXLAN tunnel (single
+                      VXLAN device mode).
+                    items:
+                      description: VLANTunnelMapping maps a VLAN ID to a VXLAN Network
+                        Identifier.
+                      properties:
+                        vid:
+                          description: Vid is the VLAN ID.
+                          type: integer
+                        vni:
+                          description: Vni is the VXLAN Network Identifier.
+                          type: integer
+                      required:
+                      - vid
+                      - vni
+                      type: object
+                    type: array
+                  vids:
+                    description: Vids is the list of VLAN IDs allowed on this port
+                      (trunk VLANs).
+                    items:
+                      type: integer
+                    type: array
+                type: object
             type: object
           status:
-            description: VxlanStatus defines the observed state of Vxlan
+            description: VXLANStatus defines the observed state of VXLAN.
             properties:
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the VXLAN's state.
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
               localIP:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
+                description: LocalIP is the observed local IP address used for this
+                  VXLAN.
                 type: string
             type: object
         type: object
